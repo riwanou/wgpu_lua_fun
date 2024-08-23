@@ -1,0 +1,14 @@
+[package]
+name = "wgpu_lua_fun"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+assets_manager = { version = "0.12.0", features = ["hot-reloading"] }
+env_logger = "0.11.5"
+log = "0.4.22"
+mlua = { version = "0.9.9", features = ["luau"] }
+pollster = "0.3.0"
+wgpu = { version = "22.1.0", default-features = false, features = ["metal", "wgsl"] }
+winit = { version = "0.30.5", default-features = false, features = ["rwh_06"] }
+
