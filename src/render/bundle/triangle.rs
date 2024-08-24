@@ -37,22 +37,6 @@ impl Bundle {
     }
 }
 
-pub struct Layout {
-    pub layout: wgpu::PipelineLayout,
-}
-
-impl Layout {
-    pub fn new(device: &wgpu::Device) -> Self {
-        let layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("triangle_layout"),
-                bind_group_layouts: &[],
-                push_constant_ranges: &[],
-            });
-        Self { layout }
-    }
-}
-
 pub struct Pipeline {
     pub pipeline: wgpu::RenderPipeline,
     shader_id: String,
@@ -67,10 +51,18 @@ impl Pipeline {
     ) -> Self {
         let shader_id = "triangle".to_string();
         let module = shaders.load_module(&shader_id, device);
+
+        let pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("triangle_layout"),
+                bind_group_layouts: &[&layouts.globals.layout],
+                push_constant_ranges: &[],
+            });
+
         let pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("triangle_pipeline"),
-                layout: Some(&layouts.triangle.layout),
+                layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &module,
                     entry_point: "vs_main",

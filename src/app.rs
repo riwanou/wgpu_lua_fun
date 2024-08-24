@@ -8,7 +8,7 @@ use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::keyboard::KeyCode;
-use winit::window::{Window, WindowId};
+use winit::window::{Window, WindowId, WindowLevel};
 
 use crate::input::{Inputs, UserEvent};
 use crate::lua::LuaState;
@@ -17,6 +17,7 @@ use crate::render::state::RenderState;
 pub const RELOAD_DEBOUNCE: Duration = Duration::from_millis(200);
 
 pub struct App {
+    not_on_top: bool,
     current: Instant,
     elapsed: Duration,
     inputs: Inputs,
@@ -27,16 +28,17 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(proxy: EventLoopProxy<UserEvent>) -> Result<Self> {
-        Ok(Self {
+    pub fn new(proxy: EventLoopProxy<UserEvent>, not_on_top: bool) -> Self {
+        Self {
+            not_on_top,
             current: Instant::now(),
             elapsed: Duration::default(),
             inputs: Inputs::default(),
-            lua: LuaState::new("main")?,
+            lua: LuaState::new("main").unwrap(),
             proxy,
             render_state: None,
             window: None,
-        })
+        }
     }
 
     fn window(&self) -> Arc<Window> {
@@ -59,16 +61,19 @@ impl App {
         let delta = self.current.elapsed();
         self.elapsed += delta;
         self.current = Instant::now();
+        let delta_sec = delta.as_secs_f32();
+        let elapsed_sec = self.elapsed.as_secs_f32();
 
         self.inputs.update();
         if self.inputs.key_pressed(KeyCode::Escape) {
             self.proxy.send_event(UserEvent::ExitApp)?;
         }
 
-        self.lua.update(delta.as_secs_f32())?;
+        self.lua.update(delta_sec)?;
 
         let render_state = self.render_state_mut();
         render_state.hot_reload();
+        render_state.prepare(elapsed_sec);
         render_state.render();
 
         Ok(())
@@ -77,6 +82,10 @@ impl App {
 
 impl ApplicationHandler<UserEvent> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let window_level = match self.not_on_top {
+            true => WindowLevel::Normal,
+            false => WindowLevel::AlwaysOnTop,
+        };
         self.window = Some(Arc::new(
             event_loop
                 .create_window(
@@ -84,9 +93,7 @@ impl ApplicationHandler<UserEvent> for App {
                         .with_title("bloup")
                         .with_inner_size(LogicalSize::new(720, 550))
                         .with_position(LogicalPosition::new(880, 0))
-                        .with_window_level(
-                            winit::window::WindowLevel::AlwaysOnTop,
-                        ),
+                        .with_window_level(window_level),
                 )
                 .expect("Could not create window"),
         ));

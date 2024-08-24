@@ -1,20 +1,22 @@
 use super::shader::ShaderAssets;
 
+pub mod globals;
 pub mod triangle;
 
 pub struct Layouts {
-    triangle: triangle::Layout,
+    globals: globals::Layout,
 }
 
 impl Layouts {
     pub fn new(device: &wgpu::Device) -> Self {
         Self {
-            triangle: triangle::Layout::new(device),
+            globals: globals::Layout::new(device),
         }
     }
 }
 
 pub struct Bundles {
+    pub globals: globals::Bundle,
     pub triangle: triangle::Bundle,
 }
 
@@ -26,6 +28,7 @@ impl Bundles {
         shaders: &mut ShaderAssets,
     ) -> Self {
         Self {
+            globals: globals::Bundle::new(device, layouts),
             triangle: triangle::Bundle::new(device, config, layouts, shaders),
         }
     }

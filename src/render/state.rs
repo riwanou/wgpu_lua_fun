@@ -72,6 +72,10 @@ impl RenderState {
         self.surface.configure(&self.device, &self.config);
     }
 
+    pub fn prepare(&mut self, elapsed: f32) {
+        self.bundles.globals.prepare(&self.queue, elapsed);
+    }
+
     pub fn render(&mut self) {
         let frame = self
             .surface
@@ -103,6 +107,7 @@ impl RenderState {
                     )],
                     ..Default::default()
                 });
+            rpass.set_bind_group(0, &self.bundles.globals.bind_group, &[]);
             rpass.set_pipeline(&self.bundles.triangle.pipeline.pipeline);
             rpass.draw(0..3, 0..1);
         }
