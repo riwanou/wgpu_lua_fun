@@ -16,6 +16,7 @@ fn main() {
 
     let event_loop = EventLoop::<UserEvent>::with_user_event().build().unwrap();
     event_loop.set_control_flow(event_loop::ControlFlow::Poll);
-    let mut app = App::new(event_loop.create_proxy());
+    let mut app =
+        App::new(event_loop.create_proxy()).expect("Could not create App");
     event_loop.run_app(&mut app).unwrap();
 }

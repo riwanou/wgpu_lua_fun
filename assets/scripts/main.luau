@@ -1,6 +1,6 @@
 --!strict
 
-print("Main luau version 2")
+print("Main luau version 7")
 
 function update(dt: number)
 	-- print("FPS:" .. dt * 1000)

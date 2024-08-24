@@ -2,12 +2,20 @@ use std::sync::Arc;
 
 use winit::{dpi::PhysicalSize, window::Window};
 
+use super::{
+    bundle::{Bundles, Layouts},
+    shader::ShaderAssets,
+};
+
 pub struct RenderState {
-    adapter: wgpu::Adapter,
+    _adapter: wgpu::Adapter,
+    bundles: Bundles,
     config: wgpu::SurfaceConfiguration,
     device: wgpu::Device,
-    instance: wgpu::Instance,
+    _instance: wgpu::Instance,
+    layouts: Layouts,
     queue: wgpu::Queue,
+    shaders: ShaderAssets,
     surface: wgpu::Surface<'static>,
 }
 
@@ -31,14 +39,31 @@ impl RenderState {
             .unwrap();
         surface.configure(&device, &config);
 
+        let mut shaders = ShaderAssets::new();
+        let layouts = Layouts::new(&device);
+        let bundles = Bundles::new(&device, &config, &layouts, &mut shaders);
+
         Self {
-            adapter,
+            _adapter: adapter,
+            bundles,
             config,
             device,
-            instance,
+            _instance: instance,
+            layouts,
             queue,
+            shaders,
             surface,
         }
+    }
+
+    pub fn hot_reload(&mut self) {
+        self.shaders.hot_reload();
+        self.bundles.hot_reload(
+            &self.device,
+            &self.config,
+            &self.layouts,
+            &mut self.shaders,
+        );
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
@@ -59,7 +84,7 @@ impl RenderState {
             &wgpu::CommandEncoderDescriptor { label: None },
         );
         {
-            let mut _rpass =
+            let mut rpass =
                 encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[Some(
                         wgpu::RenderPassColorAttachment {
@@ -78,6 +103,8 @@ impl RenderState {
                     )],
                     ..Default::default()
                 });
+            rpass.set_pipeline(&self.bundles.triangle.pipeline.pipeline);
+            rpass.draw(0..3, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
         frame.present();

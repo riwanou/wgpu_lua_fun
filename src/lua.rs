@@ -1,25 +1,26 @@
-use std::{
-    borrow::Cow,
-    ops::Deref,
-    time::{Duration, Instant},
-};
+use std::{ops::Deref, time::Instant};
 
-use assets_manager::{loader::Loader, Asset, AssetCache, BoxedError};
+use anyhow::Result;
+use assets_manager::{
+    loader::{self},
+    Asset, AssetCache,
+};
 use log::info;
 use mlua::{Compiler, Function, Lua};
 
-struct LuauScriptLoader;
-impl Loader<LuauScript> for LuauScriptLoader {
-    #[inline]
-    fn load(content: Cow<[u8]>, _: &str) -> Result<LuauScript, BoxedError> {
-        Ok(LuauScript(String::from_utf8(content.into_owned())?))
+use crate::app::RELOAD_DEBOUNCE;
+
+struct LuauScript(String);
+
+impl From<String> for LuauScript {
+    fn from(value: String) -> Self {
+        LuauScript(value)
     }
 }
 
-struct LuauScript(String);
 impl Asset for LuauScript {
     const EXTENSION: &'static str = "luau";
-    type Loader = LuauScriptLoader;
+    type Loader = loader::LoadFrom<String, loader::StringLoader>;
 }
 
 pub struct LuaState {
@@ -32,7 +33,7 @@ pub struct LuaState {
 impl LuaState {
     /// Load lua script entrypoint, will get hot-reloaded.
     /// This should contains a global update function.
-    pub fn new(entry_point: &str) -> mlua::Result<Self> {
+    pub fn new(entry_point: &str) -> Result<Self> {
         let lua = Lua::new();
         lua.set_compiler(Compiler::new().set_type_info_level(1));
 
@@ -41,11 +42,11 @@ impl LuaState {
         my_table.set("two", 2)?;
         lua.globals().set("my_table", my_table)?;
 
-        let cache = AssetCache::new("assets/scripts").unwrap();
+        let cache = AssetCache::new("assets/scripts")?;
         {
             info!("Loading luau script from {}.luau", entry_point);
-            let data = cache.load_expect::<LuauScript>(entry_point).read();
-            Self::load_entry_point(&lua, data.0.deref()).unwrap();
+            let handle = cache.load_expect::<LuauScript>(entry_point);
+            Self::load_entry_point(&lua, handle.read().0.deref())?;
         }
 
         Ok(Self {
@@ -56,23 +57,20 @@ impl LuaState {
         })
     }
 
-    fn load_entry_point(lua: &Lua, data: &str) -> mlua::Result<()> {
-        lua.load(data).set_name("entry_point").exec()
+    fn load_entry_point(lua: &Lua, data: &str) -> Result<()> {
+        lua.load(data).set_name("entry_point").exec()?;
+        Ok(())
     }
 
-    pub fn update(&mut self, delta_sec: f32) -> mlua::Result<()> {
+    pub fn update(&mut self, delta_sec: f32) -> Result<()> {
         self.cache.hot_reload();
-        let handle = self
-            .cache
-            .get_cached::<LuauScript>(&self.entry_point)
-            .unwrap();
-        if handle.reloaded_global() {
-            // small debounce to avoid falsy reload (happens on my machine)
-            if self.last_reload.elapsed() >= Duration::from_millis(100) {
-                self.last_reload = Instant::now();
+
+        let handle = self.cache.load_expect::<LuauScript>(&self.entry_point);
+        if self.last_reload.elapsed() >= RELOAD_DEBOUNCE {
+            self.last_reload = Instant::now();
+            if handle.reloaded_global() {
                 info!("Reloading luau script from {}.luau", self.entry_point);
-                let data = handle.read();
-                Self::load_entry_point(&self.lua, data.0.deref()).unwrap();
+                Self::load_entry_point(&self.lua, handle.read().0.deref())?;
             }
         }
 

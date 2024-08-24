@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use anyhow::Result;
 use log::info;
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalPosition, LogicalSize};
@@ -13,6 +14,8 @@ use crate::input::{Inputs, UserEvent};
 use crate::lua::LuaState;
 use crate::render::state::RenderState;
 
+pub const RELOAD_DEBOUNCE: Duration = Duration::from_millis(200);
+
 pub struct App {
     current: Instant,
     elapsed: Duration,
@@ -24,36 +27,51 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(proxy: EventLoopProxy<UserEvent>) -> Self {
-        Self {
+    pub fn new(proxy: EventLoopProxy<UserEvent>) -> Result<Self> {
+        Ok(Self {
             current: Instant::now(),
             elapsed: Duration::default(),
             inputs: Inputs::default(),
-            lua: LuaState::new("main").unwrap(),
+            lua: LuaState::new("main")?,
             proxy,
             render_state: None,
             window: None,
-        }
+        })
     }
 
-    pub fn init(&mut self) {
-        let window = self.window.clone().unwrap();
-        self.render_state = Some(pollster::block_on(RenderState::new(window)));
+    fn window(&self) -> Arc<Window> {
+        self.window.clone().expect("Window not created")
     }
 
-    pub fn update(&mut self) {
+    fn render_state_mut(&mut self) -> &mut RenderState {
+        self.render_state
+            .as_mut()
+            .expect("Render state not created")
+    }
+
+    pub fn init(&mut self) -> Result<()> {
+        self.render_state =
+            Some(pollster::block_on(RenderState::new(self.window())));
+        Ok(())
+    }
+
+    pub fn update(&mut self) -> Result<()> {
         let delta = self.current.elapsed();
         self.elapsed += delta;
         self.current = Instant::now();
 
         self.inputs.update();
         if self.inputs.key_pressed(KeyCode::Escape) {
-            self.proxy.send_event(UserEvent::ExitApp).unwrap();
+            self.proxy.send_event(UserEvent::ExitApp)?;
         }
 
-        self.lua.update(delta.as_secs_f32()).unwrap();
+        self.lua.update(delta.as_secs_f32())?;
 
-        self.render_state.as_mut().unwrap().render();
+        let render_state = self.render_state_mut();
+        render_state.hot_reload();
+        render_state.render();
+
+        Ok(())
     }
 }
 
@@ -70,9 +88,9 @@ impl ApplicationHandler<UserEvent> for App {
                             winit::window::WindowLevel::AlwaysOnTop,
                         ),
                 )
-                .unwrap(),
+                .expect("Could not create window"),
         ));
-        self.init();
+        self.init().unwrap();
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
@@ -95,11 +113,11 @@ impl ApplicationHandler<UserEvent> for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                self.render_state.as_mut().unwrap().resize(size);
+                self.render_state_mut().resize(size);
             }
             WindowEvent::RedrawRequested => {
-                self.update();
-                self.window.as_ref().unwrap().request_redraw();
+                self.update().unwrap();
+                self.window().request_redraw();
             }
             _ => (),
         }
@@ -107,6 +125,6 @@ impl ApplicationHandler<UserEvent> for App {
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        self.window.as_ref().unwrap().request_redraw();
+        self.window().request_redraw();
     }
 }
