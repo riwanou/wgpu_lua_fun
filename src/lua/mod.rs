@@ -5,7 +5,7 @@ use assets_manager::{
     loader::{self},
     Asset, AssetCache,
 };
-use log::info;
+use log::error;
 use mlua::{Compiler, Function, Lua};
 use scene::register_types;
 
@@ -31,6 +31,7 @@ pub struct LuaState {
     entry_point: String,
     last_reload: Instant,
     lua: Lua,
+    update_got_error: bool,
 }
 
 impl LuaState {
@@ -40,33 +41,34 @@ impl LuaState {
         let lua = Lua::new();
         lua.set_compiler(Compiler::new().set_type_info_level(1));
 
-        let cache = AssetCache::new("assets/scripts").unwrap();
+        register_types(&lua).unwrap();
 
+        let cache = AssetCache::new("assets/scripts").unwrap();
         {
-            info!("Loading luau script from {}.luau", entry_point);
             let handle = cache.load_expect::<LuauScript>(entry_point);
             Self::load_entry_point(&lua, handle.read().0.deref()).unwrap();
         }
-
-        register_types(&lua).unwrap();
 
         Self {
             cache,
             entry_point: entry_point.to_string(),
             last_reload: Instant::now(),
             lua,
+            update_got_error: false,
         }
     }
 
     pub fn init(&mut self, render_state: &mut RenderState) -> Result<()> {
         let globals = self.lua.globals();
 
-        info!("Running luau init function");
         self.lua.scope(|scope| {
             let camera = scope
                 .create_any_userdata_ref_mut(&mut render_state.scene.camera)?;
             let init_fn = globals.get::<_, Function>("init")?;
-            init_fn.call::<_, ()>(camera)
+            if let Err(err) = init_fn.call::<_, ()>(camera) {
+                error!("\nInit function failed:\n{}", err.to_string(),);
+            }
+            Ok(())
         })?;
 
         Ok(())
@@ -87,9 +89,13 @@ impl LuaState {
         if self.last_reload.elapsed() >= RELOAD_DEBOUNCE {
             self.last_reload = Instant::now();
             if handle.reloaded_global() {
-                info!("Reloading luau script from {}.luau", self.entry_point);
+                self.update_got_error = false;
                 Self::load_entry_point(&self.lua, handle.read().0.deref())?;
             }
+        }
+
+        if self.update_got_error {
+            return Ok(());
         }
 
         let globals = self.lua.globals();
@@ -97,7 +103,11 @@ impl LuaState {
             let camera = scope
                 .create_any_userdata_ref_mut(&mut render_state.scene.camera)?;
             let update_fn = globals.get::<_, Function>("update")?;
-            update_fn.call::<_, ()>((delta_sec, camera))
+            if let Err(err) = update_fn.call::<_, ()>((delta_sec, camera)) {
+                self.update_got_error = true;
+                error!("\nUpdate function failed:\n{}", err.to_string(),);
+            }
+            Ok(())
         })?;
 
         Ok(())

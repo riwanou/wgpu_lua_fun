@@ -2,6 +2,7 @@ use std::ops::{Add, Sub};
 
 use anyhow::Result;
 use glam::Vec3;
+use log::info;
 use mlua::{AnyUserData, Lua, MetaMethod, UserDataFields, UserDataMethods};
 
 use crate::render::camera::Camera;
@@ -98,7 +99,16 @@ fn register_camera(lua: &Lua) -> Result<()> {
 }
 
 pub fn register_types(lua: &Lua) -> Result<()> {
+    lua.globals().set(
+        "print",
+        lua.create_function(|_, (msg,): (String,)| {
+            info!("{}", msg);
+            Ok(())
+        })?,
+    )?;
+
     register_vec3(lua)?;
     register_camera(lua)?;
+
     Ok(())
 }

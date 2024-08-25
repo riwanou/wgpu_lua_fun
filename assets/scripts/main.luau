@@ -1,7 +1,3 @@
---!strict
-
-print("Main luau version 1")
-
 function init(camera: Camera)
 	camera.pos = Vec3.new(0.5, 0, 2)
 	print(camera.fovy, camera.pos)
