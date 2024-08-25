@@ -34,7 +34,7 @@ impl App {
             current: Instant::now(),
             elapsed: Duration::default(),
             inputs: Inputs::default(),
-            lua: LuaState::new("main").unwrap(),
+            lua: LuaState::new("main"),
             proxy,
             render_state: None,
             window: None,
@@ -45,15 +45,10 @@ impl App {
         self.window.clone().expect("Window not created")
     }
 
-    fn render_state_mut(&mut self) -> &mut RenderState {
-        self.render_state
-            .as_mut()
-            .expect("Render state not created")
-    }
-
     pub fn init(&mut self) -> Result<()> {
         self.render_state =
             Some(pollster::block_on(RenderState::new(self.window())));
+        self.lua.init(self.render_state.as_mut().unwrap())?;
         Ok(())
     }
 
@@ -64,14 +59,18 @@ impl App {
         let delta_sec = delta.as_secs_f32();
         let elapsed_sec = self.elapsed.as_secs_f32();
 
+        let lua = &mut self.lua;
+        let render_state = self.render_state.as_mut().unwrap();
+        lua.update(render_state, delta_sec)?;
+
         self.inputs.update();
         if self.inputs.key_pressed(KeyCode::Escape) {
             self.proxy.send_event(UserEvent::ExitApp)?;
         }
+        if self.inputs.key_pressed(KeyCode::KeyR) {
+            lua.init(render_state)?;
+        }
 
-        self.lua.update(delta_sec)?;
-
-        let render_state = self.render_state_mut();
         render_state.hot_reload();
         render_state.prepare(elapsed_sec);
         render_state.render();
@@ -120,7 +119,7 @@ impl ApplicationHandler<UserEvent> for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                self.render_state_mut().resize(size);
+                self.render_state.as_mut().unwrap().resize(size);
             }
             WindowEvent::RedrawRequested => {
                 self.update().unwrap();
