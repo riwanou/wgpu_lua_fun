@@ -1,5 +1,8 @@
 use encase::ShaderType;
+use glam::Mat4;
 use wgpu::util::DeviceExt;
+
+use crate::render::state::Scene;
 
 use super::Layouts;
 
@@ -21,14 +24,27 @@ impl Bundle {
         Self { bind_group, buffer }
     }
 
-    pub fn prepare(&self, queue: &wgpu::Queue, elapsed: f32) {
-        let uniform = Uniform { elapsed };
+    pub fn prepare(
+        &self,
+        queue: &wgpu::Queue,
+        config: &wgpu::SurfaceConfiguration,
+        scene: &Scene,
+        elapsed: f32,
+    ) {
+        let aspect_ratio = config.width as f32 / config.height as f32;
+        let uniform = Uniform {
+            clip_view: scene.camera.build_projection(aspect_ratio),
+            view_world: scene.camera.build_view(),
+            elapsed,
+        };
         queue.write_buffer(&self.buffer, 0, &uniform.as_bytes());
     }
 }
 
 #[derive(Default, ShaderType)]
 pub struct Uniform {
+    clip_view: Mat4,
+    view_world: Mat4,
     elapsed: f32,
 }
 

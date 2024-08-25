@@ -1,7 +1,7 @@
 use super::shader::ShaderAssets;
 
 pub mod globals;
-pub mod triangle;
+pub mod model;
 
 pub struct Layouts {
     globals: globals::Layout,
@@ -17,7 +17,7 @@ impl Layouts {
 
 pub struct Bundles {
     pub globals: globals::Bundle,
-    pub triangle: triangle::Bundle,
+    pub model: model::Bundle,
 }
 
 impl Bundles {
@@ -29,7 +29,7 @@ impl Bundles {
     ) -> Self {
         Self {
             globals: globals::Bundle::new(device, layouts),
-            triangle: triangle::Bundle::new(device, config, layouts, shaders),
+            model: model::Bundle::new(device, config, layouts, shaders),
         }
     }
 
@@ -40,6 +40,6 @@ impl Bundles {
         layouts: &Layouts,
         shaders: &mut ShaderAssets,
     ) {
-        self.triangle.hot_reload(device, config, layouts, shaders);
+        self.model.hot_reload(device, config, layouts, shaders);
     }
 }

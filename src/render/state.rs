@@ -3,18 +3,56 @@ use std::sync::Arc;
 use winit::{dpi::PhysicalSize, window::Window};
 
 use super::{
-    bundle::{Bundles, Layouts},
+    bundle::{model, Bundles, Layouts},
+    camera::Camera,
+    mesh::Mesh,
     shader::ShaderAssets,
 };
 
+pub struct Scene {
+    pub camera: Camera,
+    mesh: Mesh,
+}
+
+impl Scene {
+    pub fn new(device: &wgpu::Device) -> Self {
+        let mesh = Mesh::new(
+            device,
+            &[
+                model::Vertex {
+                    position: [0.0, 0.5, 0.0],
+                    tex_coord: [0.0, 0.0],
+                    normal: [0.0, 0.0, 1.0],
+                },
+                model::Vertex {
+                    position: [-0.5, -0.5, 0.0],
+                    tex_coord: [0.0, 0.0],
+                    normal: [0.0, 0.0, 1.0],
+                },
+                model::Vertex {
+                    position: [0.5, -0.5, 0.0],
+                    tex_coord: [0.0, 0.0],
+                    normal: [0.0, 0.0, 1.0],
+                },
+            ],
+            &[0, 1, 2],
+        );
+        Self {
+            camera: Camera::new(),
+            mesh,
+        }
+    }
+}
+
 pub struct RenderState {
     _adapter: wgpu::Adapter,
+    _instance: wgpu::Instance,
     bundles: Bundles,
     config: wgpu::SurfaceConfiguration,
     device: wgpu::Device,
-    _instance: wgpu::Instance,
     layouts: Layouts,
     queue: wgpu::Queue,
+    pub scene: Scene,
     shaders: ShaderAssets,
     surface: wgpu::Surface<'static>,
 }
@@ -42,6 +80,7 @@ impl RenderState {
         let mut shaders = ShaderAssets::new();
         let layouts = Layouts::new(&device);
         let bundles = Bundles::new(&device, &config, &layouts, &mut shaders);
+        let scene = Scene::new(&device);
 
         Self {
             _adapter: adapter,
@@ -51,6 +90,7 @@ impl RenderState {
             _instance: instance,
             layouts,
             queue,
+            scene,
             shaders,
             surface,
         }
@@ -73,7 +113,12 @@ impl RenderState {
     }
 
     pub fn prepare(&mut self, elapsed: f32) {
-        self.bundles.globals.prepare(&self.queue, elapsed);
+        self.bundles.globals.prepare(
+            &self.queue,
+            &self.config,
+            &self.scene,
+            elapsed,
+        );
     }
 
     pub fn render(&mut self) {
@@ -107,9 +152,17 @@ impl RenderState {
                     )],
                     ..Default::default()
                 });
+
+            rpass.set_pipeline(&self.bundles.model.pipeline.pipeline);
+
             rpass.set_bind_group(0, &self.bundles.globals.bind_group, &[]);
-            rpass.set_pipeline(&self.bundles.triangle.pipeline.pipeline);
-            rpass.draw(0..3, 0..1);
+            rpass.set_vertex_buffer(0, self.scene.mesh.vertex_buffer.slice(..));
+            rpass.set_index_buffer(
+                self.scene.mesh.index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
+
+            rpass.draw_indexed(0..self.scene.mesh.num_indices, 0, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
         frame.present();
