@@ -3,9 +3,12 @@ use std::ops::{Add, Sub};
 use anyhow::Result;
 use glam::Vec3;
 use log::info;
-use mlua::{AnyUserData, Lua, MetaMethod, UserDataFields, UserDataMethods};
+use mlua::{
+    AnyUserData, Function, Lua, MetaMethod, Scope, Table, UserDataFields,
+    UserDataMethods, Variadic,
+};
 
-use crate::render::camera::Camera;
+use crate::render::{camera::Camera, state::Scene};
 
 macro_rules! register_getters {
     ($reg:expr, { $( $field:ident ),* } $( ,any: { $( $any_field:ident ),* } )?) => {
@@ -17,7 +20,7 @@ macro_rules! register_getters {
         $(
             $(
                 $reg.add_field_method_get(stringify!($any_field), |_, this| {
-                    Ok(AnyUserData::wrap(this.$any_field.clone()))
+                    Ok(AnyUserData::wrap(this.$any_field))
                 });
             )*
         )?
@@ -65,8 +68,6 @@ macro_rules! register_meta_binary {
 }
 
 fn register_vec3(lua: &Lua) -> Result<()> {
-    let table = lua.create_table()?;
-
     lua.register_userdata_type::<Vec3>(|reg| {
         register_getters!(reg, { x, y, z });
         register_meta_binary!(reg, Add, Vec3, |lhs: Vec3, rhs: Vec3| {
@@ -77,14 +78,16 @@ fn register_vec3(lua: &Lua) -> Result<()> {
         });
         register_meta_string!(reg);
     })?;
+
+    let table = lua.create_table()?;
     table.set(
         "new",
         lua.create_function(|_, (x, y, z): (f32, f32, f32)| {
             Ok(AnyUserData::wrap(Vec3::new(x, y, z)))
         })?,
     )?;
-
     lua.globals().set("Vec3", table)?;
+
     Ok(())
 }
 
@@ -98,13 +101,28 @@ fn register_camera(lua: &Lua) -> Result<()> {
     Ok(())
 }
 
+pub fn create_scene<'lua>(
+    lua: &'lua Lua,
+    scope: &Scope<'_, 'lua>,
+    scene: &'lua mut Scene,
+) -> mlua::Result<Table<'lua>> {
+    let table = lua.create_table()?;
+    table.set(
+        "camera",
+        scope.create_any_userdata_ref_mut(&mut scene.camera)?,
+    )?;
+    Ok(table)
+}
+
 pub fn register_types(lua: &Lua) -> Result<()> {
     lua.globals().set(
         "print",
-        lua.create_function(|_, (msg,): (String,)| {
-            info!("{}", msg);
+        Function::wrap(|_, vals: Variadic<mlua::Value>| {
+            let args: Vec<String> =
+                vals.iter().map(|val| val.to_string().unwrap()).collect();
+            info!("{}", args.join(", "));
             Ok(())
-        })?,
+        }),
     )?;
 
     register_vec3(lua)?;

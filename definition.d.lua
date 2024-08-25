@@ -14,3 +14,7 @@ declare class Camera
 	pos: Vec3
 	fovy: number
 end
+
+export type Scene = {
+  camera: Camera
+}

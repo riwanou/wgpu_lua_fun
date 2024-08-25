@@ -7,7 +7,7 @@ use assets_manager::{
 };
 use log::error;
 use mlua::{Compiler, Function, Lua};
-use scene::register_types;
+use scene::{create_scene, register_types};
 
 use crate::{app::RELOAD_DEBOUNCE, render::state::RenderState};
 
@@ -62,10 +62,10 @@ impl LuaState {
         let globals = self.lua.globals();
 
         self.lua.scope(|scope| {
-            let camera = scope
-                .create_any_userdata_ref_mut(&mut render_state.scene.camera)?;
+            let scene =
+                create_scene(&self.lua, scope, &mut render_state.scene)?;
             let init_fn = globals.get::<_, Function>("init")?;
-            if let Err(err) = init_fn.call::<_, ()>(camera) {
+            if let Err(err) = init_fn.call::<_, ()>(scene) {
                 error!("\nInit function failed:\n{}", err.to_string(),);
             }
             Ok(())
@@ -100,10 +100,10 @@ impl LuaState {
 
         let globals = self.lua.globals();
         self.lua.scope(|scope| {
-            let camera = scope
-                .create_any_userdata_ref_mut(&mut render_state.scene.camera)?;
+            let scene =
+                create_scene(&self.lua, scope, &mut render_state.scene)?;
             let update_fn = globals.get::<_, Function>("update")?;
-            if let Err(err) = update_fn.call::<_, ()>((delta_sec, camera)) {
+            if let Err(err) = update_fn.call::<_, ()>((delta_sec, scene)) {
                 self.update_got_error = true;
                 error!("\nUpdate function failed:\n{}", err.to_string(),);
             }
