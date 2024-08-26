@@ -62,8 +62,7 @@ impl LuaState {
         let globals = self.lua.globals();
 
         self.lua.scope(|scope| {
-            let scene =
-                create_scene(&self.lua, scope, &mut render_state.scene)?;
+            let scene = create_scene(&self.lua, scope, render_state)?;
             let init_fn = globals.get::<_, Function>("init")?;
             if let Err(err) = init_fn.call::<_, ()>(scene) {
                 error!("\nInit function failed:\n{}", err.to_string(),);
@@ -100,8 +99,7 @@ impl LuaState {
 
         let globals = self.lua.globals();
         self.lua.scope(|scope| {
-            let scene =
-                create_scene(&self.lua, scope, &mut render_state.scene)?;
+            let scene = create_scene(&self.lua, scope, render_state)?;
             let update_fn = globals.get::<_, Function>("update")?;
             if let Err(err) = update_fn.call::<_, ()>((delta_sec, scene)) {
                 self.update_got_error = true;

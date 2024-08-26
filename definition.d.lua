@@ -15,6 +15,21 @@ declare class Camera
 	fovy: number
 end
 
+declare class String
+  function get(self): string
+  function set(self, val: string): ()
+end
+
+declare class Device
+end
+
+declare class MeshAssets
+  function load(self, mesh_id: string, device: Device): string
+end
+
 export type Scene = {
-  camera: Camera
+  camera: Camera,
+  mesh_id: String,
+  device: Device,
+  meshes: MeshAssets,
 }

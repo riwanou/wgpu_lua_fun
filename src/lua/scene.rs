@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, Deref, Sub};
 
 use anyhow::Result;
 use glam::Vec3;
@@ -8,7 +8,7 @@ use mlua::{
     UserDataMethods, Variadic,
 };
 
-use crate::render::{camera::Camera, state::Scene};
+use crate::render::{camera::Camera, mesh::MeshAssets, state::RenderState};
 
 macro_rules! register_getters {
     ($reg:expr, { $( $field:ident ),* } $( ,any: { $( $any_field:ident ),* } )?) => {
@@ -97,21 +97,24 @@ fn register_camera(lua: &Lua) -> Result<()> {
         register_setters!(reg, { fovy }, any: { pos: Vec3 });
         register_meta_string!(reg);
     })?;
-
     Ok(())
 }
 
-pub fn create_scene<'lua>(
-    lua: &'lua Lua,
-    scope: &Scope<'_, 'lua>,
-    scene: &'lua mut Scene,
-) -> mlua::Result<Table<'lua>> {
-    let table = lua.create_table()?;
-    table.set(
-        "camera",
-        scope.create_any_userdata_ref_mut(&mut scene.camera)?,
-    )?;
-    Ok(table)
+fn register_meshes(lua: &Lua) -> Result<()> {
+    lua.register_userdata_type::<MeshAssets>(|reg| {
+        reg.add_method_mut(
+            "load",
+            |_, this, (mesh_id, device): (String, AnyUserData)| {
+                let device = device.borrow::<wgpu::Device>()?;
+                let mesh_id =
+                    this.load(&mesh_id, device.deref()).map_err(|err| {
+                        mlua::Error::external(format!("{:?}", err))
+                    })?;
+                Ok(mesh_id)
+            },
+        );
+    })?;
+    Ok(())
 }
 
 pub fn register_types(lua: &Lua) -> Result<()> {
@@ -127,6 +130,43 @@ pub fn register_types(lua: &Lua) -> Result<()> {
 
     register_vec3(lua)?;
     register_camera(lua)?;
+    register_meshes(lua)?;
 
     Ok(())
+}
+
+pub fn create_scene<'lua>(
+    lua: &'lua Lua,
+    scope: &Scope<'_, 'lua>,
+    render_state: &'lua mut RenderState,
+) -> mlua::Result<Table<'lua>> {
+    let table = lua.create_table()?;
+    let scene = &mut render_state.scene;
+
+    table.set(
+        "camera",
+        scope.create_any_userdata_ref_mut(&mut scene.camera)?,
+    )?;
+    table.set(
+        "device",
+        scope.create_any_userdata_ref(&render_state.device)?,
+    )?;
+    table.set(
+        "meshes",
+        scope.create_any_userdata_ref_mut(&mut render_state.meshes)?,
+    )?;
+
+    lua.register_userdata_type::<String>(|reg| {
+        reg.add_method("get", |lua, this, _: ()| Ok(lua.create_string(this)));
+        reg.add_method_mut("set", |_, this, val: String| {
+            *this = val;
+            Ok(())
+        });
+    })?;
+    table.set(
+        "mesh_id",
+        scope.create_any_userdata_ref_mut(&mut scene.mesh_id)?,
+    )?;
+
+    Ok(table)
 }

@@ -3,43 +3,22 @@ use std::sync::Arc;
 use winit::{dpi::PhysicalSize, window::Window};
 
 use super::{
-    bundle::{model, Bundles, Layouts},
+    bundle::{Bundles, Layouts},
     camera::Camera,
-    mesh::Mesh,
+    mesh::MeshAssets,
     shader::ShaderAssets,
 };
 
 pub struct Scene {
     pub camera: Camera,
-    mesh: Mesh,
+    pub mesh_id: String,
 }
 
 impl Scene {
-    pub fn new(device: &wgpu::Device) -> Self {
-        let mesh = Mesh::new(
-            device,
-            &[
-                model::Vertex {
-                    position: [0.0, 0.5, 0.0],
-                    tex_coord: [0.0, 0.0],
-                    normal: [0.0, 0.0, 1.0],
-                },
-                model::Vertex {
-                    position: [-0.5, -0.5, 0.0],
-                    tex_coord: [0.0, 0.0],
-                    normal: [0.0, 0.0, 1.0],
-                },
-                model::Vertex {
-                    position: [0.5, -0.5, 0.0],
-                    tex_coord: [0.0, 0.0],
-                    normal: [0.0, 0.0, 1.0],
-                },
-            ],
-            &[0, 1, 2],
-        );
+    pub fn new() -> Self {
         Self {
             camera: Camera::new(),
-            mesh,
+            mesh_id: "cube".to_string(),
         }
     }
 }
@@ -49,8 +28,9 @@ pub struct RenderState {
     _instance: wgpu::Instance,
     bundles: Bundles,
     config: wgpu::SurfaceConfiguration,
-    device: wgpu::Device,
+    pub device: wgpu::Device,
     layouts: Layouts,
+    pub meshes: MeshAssets,
     queue: wgpu::Queue,
     pub scene: Scene,
     shaders: ShaderAssets,
@@ -78,9 +58,10 @@ impl RenderState {
         surface.configure(&device, &config);
 
         let mut shaders = ShaderAssets::new();
+        let meshes = MeshAssets::new();
         let layouts = Layouts::new(&device);
         let bundles = Bundles::new(&device, &config, &layouts, &mut shaders);
-        let scene = Scene::new(&device);
+        let scene = Scene::new();
 
         Self {
             _adapter: adapter,
@@ -89,6 +70,7 @@ impl RenderState {
             device,
             _instance: instance,
             layouts,
+            meshes,
             queue,
             scene,
             shaders,
@@ -98,6 +80,7 @@ impl RenderState {
 
     pub fn hot_reload(&mut self) {
         self.shaders.hot_reload();
+        self.meshes.hot_reload(&self.device);
         self.bundles.hot_reload(
             &self.device,
             &self.config,
@@ -154,15 +137,16 @@ impl RenderState {
                 });
 
             rpass.set_pipeline(&self.bundles.model.pipeline.pipeline);
-
             rpass.set_bind_group(0, &self.bundles.globals.bind_group, &[]);
-            rpass.set_vertex_buffer(0, self.scene.mesh.vertex_buffer.slice(..));
-            rpass.set_index_buffer(
-                self.scene.mesh.index_buffer.slice(..),
-                wgpu::IndexFormat::Uint32,
-            );
 
-            rpass.draw_indexed(0..self.scene.mesh.num_indices, 0, 0..1);
+            if let Ok(mesh) = self.meshes.get(&self.scene.mesh_id) {
+                rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                rpass.set_index_buffer(
+                    mesh.index_buffer.slice(..),
+                    wgpu::IndexFormat::Uint32,
+                );
+                rpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+            }
         }
         self.queue.submit(Some(encoder.finish()));
         frame.present();

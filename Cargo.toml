@@ -14,6 +14,7 @@ log = "0.4.22"
 mlua = { version = "0.9.9", features = ["luau", "serialize"] }
 pollster = "0.3.0"
 serde = { version = "1.0.209", features = ["derive"] }
+tobj = "4.0.2"
 wgpu = { version = "22.1.0", default-features = false, features = ["metal", "wgsl"] }
 winit = { version = "0.30.5", default-features = false, features = ["rwh_06"] }
 

@@ -43,7 +43,7 @@ impl ShaderAssets {
         false
     }
 
-    pub fn load_module(
+    pub fn load(
         &self,
         shader_id: &str,
         device: &wgpu::Device,

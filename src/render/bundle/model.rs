@@ -76,7 +76,7 @@ impl Pipeline {
         shaders: &mut ShaderAssets,
     ) -> Self {
         let shader_id = "model".to_string();
-        let module = shaders.load_module(&shader_id, device);
+        let module = shaders.load(&shader_id, device);
 
         let pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
