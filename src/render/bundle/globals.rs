@@ -2,7 +2,7 @@ use encase::ShaderType;
 use glam::Mat4;
 use wgpu::util::DeviceExt;
 
-use crate::render::state::Scene;
+use crate::scene::Scene;
 
 use super::Layouts;
 

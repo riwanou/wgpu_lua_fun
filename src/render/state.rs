@@ -2,26 +2,13 @@ use std::sync::Arc;
 
 use winit::{dpi::PhysicalSize, window::Window};
 
+use crate::scene::Scene;
+
 use super::{
     bundle::{Bundles, Layouts},
-    camera::Camera,
     mesh::MeshAssets,
     shader::ShaderAssets,
 };
-
-pub struct Scene {
-    pub camera: Camera,
-    pub mesh_id: String,
-}
-
-impl Scene {
-    pub fn new() -> Self {
-        Self {
-            camera: Camera::new(),
-            mesh_id: "cube".to_string(),
-        }
-    }
-}
 
 pub struct RenderState {
     _adapter: wgpu::Adapter,

@@ -9,6 +9,7 @@ mod app;
 mod input;
 mod lua;
 mod render;
+mod scene;
 
 fn main() {
     env_logger::Builder::from_env(
