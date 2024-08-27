@@ -24,12 +24,11 @@ declare class Device
 end
 
 declare class MeshAssets
-  function load(self, mesh_id: string, device: Device): string
+  function load(self, mesh_id: string): ()
 end
 
 export type Scene = {
   camera: Camera,
   mesh_id: String,
-  device: Device,
   meshes: MeshAssets,
 }

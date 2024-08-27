@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use log::info;
+use threadpool::ThreadPool;
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::event::WindowEvent;
@@ -15,6 +16,18 @@ use crate::lua::LuaState;
 use crate::render::state::RenderState;
 
 pub const RELOAD_DEBOUNCE: Duration = Duration::from_millis(200);
+
+static INIT: Once = Once::new();
+static mut THREAD_POOL: Option<Arc<ThreadPool>> = None;
+
+pub fn get_pool() -> Arc<ThreadPool> {
+    unsafe {
+        INIT.call_once(|| {
+            THREAD_POOL = Some(Arc::new(ThreadPool::new(4)));
+        });
+        THREAD_POOL.clone().expect("Thread pool is not initialized")
+    }
+}
 
 pub struct App {
     not_on_top: bool,

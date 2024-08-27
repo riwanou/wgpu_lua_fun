@@ -1,4 +1,4 @@
-use std::ops::{Add, Deref, Sub};
+use std::ops::{Add, Sub};
 
 use anyhow::Result;
 use glam::Vec3;
@@ -102,17 +102,10 @@ fn register_camera(lua: &Lua) -> Result<()> {
 
 fn register_meshes(lua: &Lua) -> Result<()> {
     lua.register_userdata_type::<MeshAssets>(|reg| {
-        reg.add_method_mut(
-            "load",
-            |_, this, (mesh_id, device): (String, AnyUserData)| {
-                let device = device.borrow::<wgpu::Device>()?;
-                let mesh_id =
-                    this.load(&mesh_id, device.deref()).map_err(|err| {
-                        mlua::Error::external(format!("{:?}", err))
-                    })?;
-                Ok(mesh_id)
-            },
-        );
+        reg.add_method_mut("load", |_, this, mesh_id: String| {
+            this.load(&mesh_id);
+            Ok(())
+        });
     })?;
     Ok(())
 }
@@ -146,10 +139,6 @@ pub fn create_scene<'lua>(
     table.set(
         "camera",
         scope.create_any_userdata_ref_mut(&mut scene.camera)?,
-    )?;
-    table.set(
-        "device",
-        scope.create_any_userdata_ref(&render_state.device)?,
     )?;
     table.set(
         "meshes",

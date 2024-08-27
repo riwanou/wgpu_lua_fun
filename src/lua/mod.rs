@@ -46,7 +46,7 @@ impl LuaState {
         let cache = AssetCache::new("assets/scripts").unwrap();
         {
             let handle = cache.load_expect::<LuauScript>(entry_point);
-            Self::load_entry_point(&lua, handle.read().0.deref()).unwrap();
+            Self::load_entry_point(&lua, handle.read().0.deref());
         }
 
         Self {
@@ -63,9 +63,13 @@ impl LuaState {
 
         self.lua.scope(|scope| {
             let scene = create_scene(&self.lua, scope, render_state)?;
-            let init_fn = globals.get::<_, Function>("init")?;
-            if let Err(err) = init_fn.call::<_, ()>(scene) {
-                error!("\nInit function failed:\n{}", err.to_string(),);
+            let result: mlua::Result<()> = (|| {
+                let init_fn = globals.get::<_, Function>("init")?;
+                init_fn.call::<_, ()>(scene)?;
+                Ok(())
+            })();
+            if let Err(err) = result {
+                error!("init\n{}", err);
             }
             Ok(())
         })?;
@@ -73,9 +77,10 @@ impl LuaState {
         Ok(())
     }
 
-    fn load_entry_point(lua: &Lua, data: &str) -> Result<()> {
-        lua.load(data).set_name("entry_point").exec()?;
-        Ok(())
+    fn load_entry_point(lua: &Lua, data: &str) {
+        if let Err(err) = lua.load(data).set_name("entry_point").exec() {
+            error!("entry_point\n{}", err.to_string());
+        }
     }
 
     pub fn update(
@@ -89,7 +94,7 @@ impl LuaState {
             self.last_reload = Instant::now();
             if handle.reloaded_global() {
                 self.update_got_error = false;
-                Self::load_entry_point(&self.lua, handle.read().0.deref())?;
+                Self::load_entry_point(&self.lua, handle.read().0.deref());
             }
         }
 
@@ -100,10 +105,16 @@ impl LuaState {
         let globals = self.lua.globals();
         self.lua.scope(|scope| {
             let scene = create_scene(&self.lua, scope, render_state)?;
-            let update_fn = globals.get::<_, Function>("update")?;
-            if let Err(err) = update_fn.call::<_, ()>((delta_sec, scene)) {
-                self.update_got_error = true;
-                error!("\nUpdate function failed:\n{}", err.to_string(),);
+            let result: mlua::Result<()> = (|| {
+                let update_fn = globals.get::<_, Function>("update")?;
+                update_fn.call::<_, ()>((delta_sec, scene))?;
+                Ok(())
+            })();
+            if let Err(err) = result {
+                if !self.update_got_error {
+                    self.update_got_error = true;
+                    error!("update\n{}", err);
+                }
             }
             Ok(())
         })?;
