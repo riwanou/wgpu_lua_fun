@@ -110,7 +110,23 @@ fn register_meshes(lua: &Lua) -> Result<()> {
     Ok(())
 }
 
-pub fn register_types(lua: &Lua) -> Result<()> {
+fn register_entities(lua: &Lua) -> Result<()> {
+    lua.globals().set("entities", lua.create_table()?)?;
+    lua.globals().set(
+        "entity",
+        lua.create_function(|lua, id: String| {
+            let entities = lua.globals().raw_get::<_, Table>("entities")?;
+            if !entities.contains_key(id.clone())? {
+                entities.raw_set(id.clone(), lua.create_table()?.clone())?;
+            }
+            entities.raw_get::<_, Table>(id)
+        })?,
+    )?;
+
+    Ok(())
+}
+
+pub fn register_types_globals(lua: &Lua) -> Result<()> {
     lua.globals().set(
         "print",
         Function::wrap(|_, vals: Variadic<mlua::Value>| {
@@ -124,6 +140,8 @@ pub fn register_types(lua: &Lua) -> Result<()> {
     register_vec3(lua)?;
     register_camera(lua)?;
     register_meshes(lua)?;
+
+    register_entities(lua)?;
 
     Ok(())
 }

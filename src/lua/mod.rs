@@ -7,7 +7,7 @@ use assets_manager::{
 };
 use log::error;
 use mlua::{Compiler, Function, Lua};
-use scene::{create_scene, register_types};
+use scene::{create_scene, register_types_globals};
 
 use crate::{app::RELOAD_DEBOUNCE, render::state::RenderState};
 
@@ -41,7 +41,7 @@ impl LuaState {
         let lua = Lua::new();
         lua.set_compiler(Compiler::new().set_type_info_level(1));
 
-        register_types(&lua).unwrap();
+        register_types_globals(&lua).unwrap();
 
         let cache = AssetCache::new("assets/scripts").unwrap();
         {

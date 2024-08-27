@@ -20,9 +20,6 @@ declare class String
   function set(self, val: string): ()
 end
 
-declare class Device
-end
-
 declare class MeshAssets
   function load(self, mesh_id: string): ()
 end
@@ -32,3 +29,6 @@ export type Scene = {
   mesh_id: String,
   meshes: MeshAssets,
 }
+
+declare entities: { [string]: any }
+declare function entity(id: string): any
