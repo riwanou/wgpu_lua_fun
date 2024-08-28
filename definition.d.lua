@@ -28,6 +28,7 @@ export type Scene = {
   camera: Camera,
   mesh_id: String,
   meshes: MeshAssets,
+  render_model: (mesh_id: string, pos: Vec3) -> (),
 }
 
 declare entities: { [string]: any }

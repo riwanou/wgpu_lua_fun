@@ -19,7 +19,6 @@ pub struct RenderState {
     layouts: Layouts,
     pub meshes: MeshAssets,
     queue: wgpu::Queue,
-    pub scene: Scene,
     shaders: ShaderAssets,
     surface: wgpu::Surface<'static>,
 }
@@ -48,7 +47,6 @@ impl RenderState {
         let meshes = MeshAssets::new();
         let layouts = Layouts::new(&device);
         let bundles = Bundles::new(&device, &config, &layouts, &mut shaders);
-        let scene = Scene::new();
 
         Self {
             _adapter: adapter,
@@ -59,7 +57,6 @@ impl RenderState {
             layouts,
             meshes,
             queue,
-            scene,
             shaders,
             surface,
         }
@@ -82,16 +79,7 @@ impl RenderState {
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn prepare(&mut self, elapsed: f32) {
-        self.bundles.globals.prepare(
-            &self.queue,
-            &self.config,
-            &self.scene,
-            elapsed,
-        );
-    }
-
-    pub fn render(&mut self) {
+    pub fn render(&mut self, elapsed: f32, scene: &mut Scene) {
         let frame = self
             .surface
             .get_current_texture()
@@ -102,6 +90,15 @@ impl RenderState {
         let mut encoder = self.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: None },
         );
+
+        self.bundles.globals.prepare(
+            &self.queue,
+            &self.config,
+            elapsed,
+            &scene.camera,
+        );
+        scene.prepare(&self.device);
+
         {
             let mut rpass =
                 encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -125,16 +122,9 @@ impl RenderState {
 
             rpass.set_pipeline(&self.bundles.model.pipeline.pipeline);
             rpass.set_bind_group(0, &self.bundles.globals.bind_group, &[]);
-
-            if let Ok(mesh) = self.meshes.get(&self.scene.mesh_id) {
-                rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                rpass.set_index_buffer(
-                    mesh.index_buffer.slice(..),
-                    wgpu::IndexFormat::Uint32,
-                );
-                rpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-            }
+            scene.model_batches.render(&mut rpass, &self.meshes);
         }
+
         self.queue.submit(Some(encoder.finish()));
         frame.present();
     }

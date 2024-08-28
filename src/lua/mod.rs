@@ -1,17 +1,16 @@
 use std::{ops::Deref, time::Instant};
 
 use anyhow::Result;
-use assets_manager::{
-    loader::{self},
-    Asset, AssetCache,
-};
-use log::error;
+use assets_manager::{loader, Asset, AssetCache};
+use log::{error, info};
 use mlua::{Compiler, Function, Lua};
 use scene::{create_scene, register_types_globals};
 
-use crate::{app::RELOAD_DEBOUNCE, render::state::RenderState};
+use crate::{app::RELOAD_DEBOUNCE, render::state::RenderState, scene::Scene};
 
 mod scene;
+
+const SCRIPTS_DIR: &str = "assets/scripts";
 
 struct LuauScript(String);
 
@@ -43,7 +42,7 @@ impl LuaState {
 
         register_types_globals(&lua).unwrap();
 
-        let cache = AssetCache::new("assets/scripts").unwrap();
+        let cache = AssetCache::new(SCRIPTS_DIR).unwrap();
         {
             let handle = cache.load_expect::<LuauScript>(entry_point);
             Self::load_entry_point(&lua, handle.read().0.deref());
@@ -58,11 +57,15 @@ impl LuaState {
         }
     }
 
-    pub fn init(&mut self, render_state: &mut RenderState) -> Result<()> {
+    pub fn init(
+        &mut self,
+        render_state: &mut RenderState,
+        scene: &mut Scene,
+    ) -> Result<()> {
         let globals = self.lua.globals();
 
         self.lua.scope(|scope| {
-            let scene = create_scene(&self.lua, scope, render_state)?;
+            let scene = create_scene(&self.lua, scope, render_state, scene)?;
             let result: mlua::Result<()> = (|| {
                 let init_fn = globals.get::<_, Function>("init")?;
                 init_fn.call::<_, ()>(scene)?;
@@ -83,16 +86,34 @@ impl LuaState {
         }
     }
 
+    fn any_script_reloaded(&self) -> Result<Option<String>> {
+        let scripts_dir = self.cache.load_dir::<LuauScript>("")?.read();
+        for script_id in scripts_dir.ids() {
+            let reloaded = self
+                .cache
+                .load_expect::<LuauScript>(script_id)
+                .reloaded_global();
+            if reloaded {
+                return Ok(Some(script_id.to_string()));
+            }
+        }
+        Ok(None)
+    }
+
     pub fn update(
         &mut self,
         render_state: &mut RenderState,
+        scene: &mut Scene,
         delta_sec: f32,
     ) -> Result<()> {
         self.cache.hot_reload();
         let handle = self.cache.load_expect::<LuauScript>(&self.entry_point);
+
         if self.last_reload.elapsed() >= RELOAD_DEBOUNCE {
             self.last_reload = Instant::now();
-            if handle.reloaded_global() {
+            if let Some(script_id) = self.any_script_reloaded()? {
+                let mod_name = format!("{}/{}", SCRIPTS_DIR, script_id);
+                self.lua.unload(&mod_name)?;
                 self.update_got_error = false;
                 Self::load_entry_point(&self.lua, handle.read().0.deref());
             }
@@ -104,7 +125,7 @@ impl LuaState {
 
         let globals = self.lua.globals();
         self.lua.scope(|scope| {
-            let scene = create_scene(&self.lua, scope, render_state)?;
+            let scene = create_scene(&self.lua, scope, render_state, scene)?;
             let result: mlua::Result<()> = (|| {
                 let update_fn = globals.get::<_, Function>("update")?;
                 update_fn.call::<_, ()>((delta_sec, scene))?;

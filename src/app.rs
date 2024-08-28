@@ -14,6 +14,7 @@ use winit::window::{Window, WindowId, WindowLevel};
 use crate::input::{Inputs, UserEvent};
 use crate::lua::LuaState;
 use crate::render::state::RenderState;
+use crate::scene::Scene;
 
 pub const RELOAD_DEBOUNCE: Duration = Duration::from_millis(200);
 
@@ -30,13 +31,14 @@ pub fn get_pool() -> Arc<ThreadPool> {
 }
 
 pub struct App {
-    not_on_top: bool,
     current: Instant,
     elapsed: Duration,
     inputs: Inputs,
     lua: LuaState,
+    not_on_top: bool,
     proxy: EventLoopProxy<UserEvent>,
     render_state: Option<RenderState>,
+    scene: Scene,
     window: Option<Arc<Window>>,
 }
 
@@ -50,6 +52,7 @@ impl App {
             lua: LuaState::new("main"),
             proxy,
             render_state: None,
+            scene: Scene::new(),
             window: None,
         }
     }
@@ -61,7 +64,8 @@ impl App {
     pub fn init(&mut self) -> Result<()> {
         self.render_state =
             Some(pollster::block_on(RenderState::new(self.window())));
-        self.lua.init(self.render_state.as_mut().unwrap())?;
+        self.lua
+            .init(self.render_state.as_mut().unwrap(), &mut self.scene)?;
         Ok(())
     }
 
@@ -74,19 +78,20 @@ impl App {
 
         let lua = &mut self.lua;
         let render_state = self.render_state.as_mut().unwrap();
-        lua.update(render_state, delta_sec)?;
+
+        self.scene.begin_frame();
+        lua.update(render_state, &mut self.scene, delta_sec)?;
 
         self.inputs.update();
         if self.inputs.key_pressed(KeyCode::Escape) {
             self.proxy.send_event(UserEvent::ExitApp)?;
         }
         if self.inputs.key_pressed(KeyCode::KeyR) {
-            lua.init(render_state)?;
+            lua.init(render_state, &mut self.scene)?;
         }
 
         render_state.hot_reload();
-        render_state.prepare(elapsed_sec);
-        render_state.render();
+        render_state.render(elapsed_sec, &mut self.scene);
 
         Ok(())
     }

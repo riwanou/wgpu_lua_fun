@@ -1,14 +1,19 @@
 use std::ops::{Add, Sub};
 
 use anyhow::Result;
-use glam::Vec3;
+use glam::{Mat4, Quat, Vec3};
 use log::info;
 use mlua::{
     AnyUserData, Function, Lua, MetaMethod, Scope, Table, UserDataFields,
     UserDataMethods, Variadic,
 };
 
-use crate::render::{camera::Camera, mesh::MeshAssets, state::RenderState};
+use crate::{
+    render::{
+        bundle::model, camera::Camera, mesh::MeshAssets, state::RenderState,
+    },
+    scene::Scene,
+};
 
 macro_rules! register_getters {
     ($reg:expr, { $( $field:ident ),* } $( ,any: { $( $any_field:ident ),* } )?) => {
@@ -150,9 +155,9 @@ pub fn create_scene<'lua>(
     lua: &'lua Lua,
     scope: &Scope<'_, 'lua>,
     render_state: &'lua mut RenderState,
+    scene: &'lua mut Scene,
 ) -> mlua::Result<Table<'lua>> {
     let table = lua.create_table()?;
-    let scene = &mut render_state.scene;
 
     table.set(
         "camera",
@@ -162,17 +167,21 @@ pub fn create_scene<'lua>(
         "meshes",
         scope.create_any_userdata_ref_mut(&mut render_state.meshes)?,
     )?;
-
-    lua.register_userdata_type::<String>(|reg| {
-        reg.add_method("get", |lua, this, _: ()| Ok(lua.create_string(this)));
-        reg.add_method_mut("set", |_, this, val: String| {
-            *this = val;
-            Ok(())
-        });
-    })?;
     table.set(
-        "mesh_id",
-        scope.create_any_userdata_ref_mut(&mut scene.mesh_id)?,
+        "render_model",
+        scope.create_function_mut(
+            |_, (mesh_id, pos): (String, AnyUserData)| {
+                let pos = pos.borrow::<Vec3>()?;
+                scene.model_batches.add_model(
+                    mesh_id,
+                    model::Instance::new(
+                        Mat4::from_translation(*pos),
+                        Quat::IDENTITY,
+                    ),
+                );
+                Ok(())
+            },
+        )?,
     )?;
 
     Ok(table)

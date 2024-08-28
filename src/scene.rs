@@ -5,16 +5,22 @@ use crate::render::{
 
 pub struct Scene {
     pub camera: Camera,
-    pub mesh_id: String,
-    pub _model_batches: model::Batches,
+    pub model_batches: model::Batches,
 }
 
 impl Scene {
     pub fn new() -> Self {
         Self {
             camera: Camera::new(),
-            mesh_id: "cube".to_string(),
-            _model_batches: Batches::default(),
+            model_batches: Batches::default(),
         }
+    }
+
+    pub fn begin_frame(&mut self) {
+        self.model_batches.clear();
+    }
+
+    pub fn prepare(&mut self, device: &wgpu::Device) {
+        self.model_batches.prepare(device);
     }
 }
