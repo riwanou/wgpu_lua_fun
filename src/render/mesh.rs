@@ -9,7 +9,7 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use assets_manager::{loader, Asset, AssetCache};
 use bytemuck::{cast_slice, Pod};
 use log::{error, info};
@@ -122,10 +122,8 @@ impl MeshAssets {
         }
     }
 
-    pub fn get(&self, mesh_id: &str) -> Result<&Mesh> {
-        self.meshes
-            .get(mesh_id)
-            .context(format!("Mesh not loaded: {}", mesh_id))
+    pub fn get(&self, mesh_id: &str) -> Option<&Mesh> {
+        self.meshes.get(mesh_id)
     }
 
     fn load_internal(&mut self, mesh_id: &str) {

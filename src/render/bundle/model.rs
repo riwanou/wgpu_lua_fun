@@ -6,7 +6,10 @@ use glam::{Mat3, Mat4, Quat};
 use log::info;
 use wgpu::util::DeviceExt;
 
-use crate::render::{mesh::VertexTrait, shader::ShaderAssets};
+use crate::render::{
+    mesh::{MeshAssets, VertexTrait},
+    shader::ShaderAssets,
+};
 
 use super::Layouts;
 
@@ -127,15 +130,44 @@ impl Batches {
     pub fn prepare(&mut self, device: &wgpu::Device) {
         for instances in self.instances.values_mut() {
             if instances.data.is_empty() {
-                instances.buffer = Some(device.create_buffer_init(
-                    &wgpu::util::BufferInitDescriptor {
-                        label: Some("model_instance"),
-                        contents: &Instance::slice_as_bytes(&instances.data),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    },
-                ))
+                continue;
             }
+            instances.buffer = Some(device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("model_instance"),
+                    contents: &Instance::slice_as_bytes(&instances.data),
+                    usage: wgpu::BufferUsages::VERTEX,
+                },
+            ))
         }
+    }
+
+    pub fn render(&self, rpass: &mut wgpu::RenderPass, meshes: &MeshAssets) {
+        for (mesh_id, instances) in &self.instances {
+            if instances.data.is_empty() {
+                continue;
+            }
+            let (Some(mesh), Some(instances_buffer)) =
+                (meshes.get(mesh_id), &instances.buffer)
+            else {
+                continue;
+            };
+            rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            rpass.set_index_buffer(
+                mesh.index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
+            rpass.set_vertex_buffer(1, instances_buffer.slice(..));
+            rpass.draw_indexed(
+                0..mesh.num_indices,
+                0,
+                0..instances.data.len() as u32,
+            );
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.instances.clear();
     }
 }
 
