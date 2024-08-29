@@ -10,6 +10,7 @@ mod input;
 mod lua;
 mod render;
 mod scene;
+mod transform;
 
 fn main() {
     env_logger::Builder::from_env(

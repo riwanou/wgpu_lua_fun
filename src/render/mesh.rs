@@ -110,6 +110,7 @@ impl MeshAssets {
         if let Ok(result) = self.load_rx.try_recv() {
             match result {
                 Ok((mesh_id, vertices, indices)) => {
+                    info!("Mesh loaded: {}", mesh_id);
                     self.meshes.insert(
                         mesh_id,
                         Mesh::new(device, &vertices, &indices),
