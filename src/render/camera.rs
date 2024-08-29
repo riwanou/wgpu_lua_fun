@@ -1,10 +1,11 @@
-use glam::{Mat4, Quat, Vec3};
+use glam::{Mat4, Vec3};
+
+use crate::{lua::shared::Shared, transform::Transform};
 
 #[derive(Debug)]
 pub struct Camera {
     pub fovy: f32,
-    pub rot: Quat,
-    pub pos: Vec3,
+    pub transform: Shared<Transform>,
     pub zfar: f32,
     pub znear: f32,
 }
@@ -13,8 +14,9 @@ impl Camera {
     pub fn new() -> Self {
         Self {
             fovy: 45.0,
-            rot: Quat::IDENTITY,
-            pos: Vec3::new(0.0, 0.0, 2.0),
+            transform: Shared::new(Transform::from_pos(Shared::new(
+                Vec3::new(0.0, 0.0, 2.0),
+            ))),
             znear: 0.1,
             zfar: 100.0,
         }
@@ -30,6 +32,6 @@ impl Camera {
     }
 
     pub fn build_view(&self) -> Mat4 {
-        Mat4::from_rotation_translation(self.rot, self.pos).inverse()
+        self.transform.borrow().build_matrix().inverse()
     }
 }

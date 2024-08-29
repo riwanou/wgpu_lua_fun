@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -21,6 +21,12 @@ pub struct RenderState {
     queue: wgpu::Queue,
     shaders: ShaderAssets,
     surface: wgpu::Surface<'static>,
+}
+
+impl fmt::Debug for RenderState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RenderState")
+    }
 }
 
 impl RenderState {
@@ -95,7 +101,7 @@ impl RenderState {
             &self.queue,
             &self.config,
             elapsed,
-            &scene.camera,
+            &scene.camera.borrow(),
         );
         scene.prepare(&self.device);
 

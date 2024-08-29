@@ -12,6 +12,7 @@ use winit::keyboard::KeyCode;
 use winit::window::{Window, WindowId, WindowLevel};
 
 use crate::input::{Inputs, UserEvent};
+use crate::lua::shared::Shared;
 use crate::lua::LuaState;
 use crate::render::state::RenderState;
 use crate::scene::Scene;
@@ -34,11 +35,11 @@ pub struct App {
     current: Instant,
     elapsed: Duration,
     inputs: Inputs,
-    lua: LuaState,
+    lua: Option<LuaState>,
     not_on_top: bool,
     proxy: EventLoopProxy<UserEvent>,
-    render_state: Option<RenderState>,
-    scene: Scene,
+    render_state: Option<Shared<RenderState>>,
+    scene: Shared<Scene>,
     window: Option<Arc<Window>>,
 }
 
@@ -49,10 +50,10 @@ impl App {
             current: Instant::now(),
             elapsed: Duration::default(),
             inputs: Inputs::default(),
-            lua: LuaState::new("main"),
+            lua: None,
             proxy,
             render_state: None,
-            scene: Scene::new(),
+            scene: Shared::new(Scene::new()),
             window: None,
         }
     }
@@ -62,10 +63,15 @@ impl App {
     }
 
     pub fn init(&mut self) -> Result<()> {
-        self.render_state =
-            Some(pollster::block_on(RenderState::new(self.window())));
-        self.lua
-            .init(self.render_state.as_mut().unwrap(), &mut self.scene)?;
+        self.render_state = Some(Shared::new(pollster::block_on(
+            RenderState::new(self.window()),
+        )));
+        self.lua = Some(LuaState::new(
+            "main",
+            self.scene.clone(),
+            self.render_state.as_ref().unwrap().clone(),
+        ));
+        self.lua.as_mut().unwrap().init()?;
         Ok(())
     }
 
@@ -76,22 +82,21 @@ impl App {
         let delta_sec = delta.as_secs_f32();
         let elapsed_sec = self.elapsed.as_secs_f32();
 
-        let lua = &mut self.lua;
-        let render_state = self.render_state.as_mut().unwrap();
-
-        self.scene.begin_frame();
-        lua.update(render_state, &mut self.scene, delta_sec)?;
+        self.scene.borrow_mut().begin_frame();
+        let lua = self.lua.as_mut().unwrap();
+        lua.update(delta_sec, elapsed_sec)?;
 
         self.inputs.update();
         if self.inputs.key_pressed(KeyCode::Escape) {
             self.proxy.send_event(UserEvent::ExitApp)?;
         }
         if self.inputs.key_pressed(KeyCode::KeyR) {
-            lua.init(render_state, &mut self.scene)?;
+            lua.init()?;
         }
 
+        let mut render_state = self.render_state.as_ref().unwrap().borrow_mut();
         render_state.hot_reload();
-        render_state.render(elapsed_sec, &mut self.scene);
+        render_state.render(elapsed_sec, &mut self.scene.borrow_mut());
 
         Ok(())
     }
@@ -137,7 +142,11 @@ impl ApplicationHandler<UserEvent> for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                self.render_state.as_mut().unwrap().resize(size);
+                self.render_state
+                    .as_ref()
+                    .unwrap()
+                    .borrow_mut()
+                    .resize(size);
             }
             WindowEvent::RedrawRequested => {
                 self.update().unwrap();

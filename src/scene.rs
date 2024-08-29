@@ -1,17 +1,28 @@
-use crate::render::{
-    bundle::model::{self, Batches},
-    camera::Camera,
+use std::fmt;
+
+use crate::{
+    lua::shared::Shared,
+    render::{
+        bundle::model::{self, Batches},
+        camera::Camera,
+    },
 };
 
 pub struct Scene {
-    pub camera: Camera,
+    pub camera: Shared<Camera>,
     pub model_batches: model::Batches,
+}
+
+impl fmt::Debug for Scene {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Scene")
+    }
 }
 
 impl Scene {
     pub fn new() -> Self {
         Self {
-            camera: Camera::new(),
+            camera: Shared::new(Camera::new()),
             model_batches: Batches::default(),
         }
     }
