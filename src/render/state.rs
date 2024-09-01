@@ -8,6 +8,7 @@ use super::{
     bundle::{Bundles, Layouts},
     mesh::MeshAssets,
     shader::ShaderAssets,
+    texture::Texture,
 };
 
 pub struct RenderState {
@@ -15,6 +16,7 @@ pub struct RenderState {
     _instance: wgpu::Instance,
     bundles: Bundles,
     config: wgpu::SurfaceConfiguration,
+    pub depth: Texture,
     pub device: wgpu::Device,
     layouts: Layouts,
     pub meshes: MeshAssets,
@@ -53,11 +55,13 @@ impl RenderState {
         let meshes = MeshAssets::new();
         let layouts = Layouts::new(&device);
         let bundles = Bundles::new(&device, &config, &layouts, &mut shaders);
+        let depth = Texture::create_depth(&device, &config);
 
         Self {
             _adapter: adapter,
             bundles,
             config,
+            depth,
             device,
             _instance: instance,
             layouts,
@@ -83,6 +87,7 @@ impl RenderState {
         self.config.width = size.width;
         self.config.height = size.height;
         self.surface.configure(&self.device, &self.config);
+        self.depth = Texture::create_depth(&self.device, &self.config);
     }
 
     pub fn render(&mut self, elapsed: f32, scene: &mut Scene) {
@@ -123,6 +128,16 @@ impl RenderState {
                             },
                         },
                     )],
+                    depth_stencil_attachment: Some(
+                        wgpu::RenderPassDepthStencilAttachment {
+                            view: &self.depth.view,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(1.0),
+                                store: wgpu::StoreOp::Store,
+                            }),
+                            stencil_ops: None,
+                        },
+                    ),
                     ..Default::default()
                 });
 

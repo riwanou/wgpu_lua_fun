@@ -1,7 +1,7 @@
 struct Globals {
     clip_view: mat4x4<f32>,
     view_world: mat4x4<f32>,
-    elasped: f32,
+    elapsed: f32,
 }
 
 @group(0) @binding(0)
@@ -15,6 +15,9 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
+    @location(0) tex_coords: vec2<f32>,
+    @location(1) world_normal: vec3<f32>,
+    @location(2) world_position: vec3<f32>,
 }
 
 struct InstanceInput {
@@ -48,7 +51,11 @@ fn vs_main(model: VertexInput, instance: InstanceInput) -> VertexOutput {
 
     var out: VertexOutput;
 
+    out.tex_coords = model.tex_coords;
+    out.world_normal = normal_rotation * model.normal;
+
     let world_position = world_local * vec4<f32>(model.position, 1.0);
+    out.world_position = world_position.xyz;
     out.clip_position = globals.clip_view * globals.view_world * world_position;
 
     return out;
@@ -56,6 +63,6 @@ fn vs_main(model: VertexInput, instance: InstanceInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let val = map(cos(globals.elasped), -1.0, 1.0, 0.1, 0.4);
-    return vec4<f32>(0.1, val, 0.2, 1.0);
+    // let val = map(cos(globals.elapsed), -1.0, 1.0, 0.1, 0.4);
+    return vec4<f32>(in.world_normal, 1.0);
 }

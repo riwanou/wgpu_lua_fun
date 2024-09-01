@@ -11,7 +11,14 @@ function init(ctx: Context)
 	ctx.scene.camera.transform.pos = Vec3.new(0.5, 0, 10)
 end
 
+function update_camera(camera: Camera, dt: number) end
+
 function update(ctx: Context, dt: number, elapsed: number)
+	local camera = ctx.scene.camera
+	if camera.transform.pos.x > 0 then
+		camera.transform.pos.x -= dt
+	end
+
 	player:update(dt, elapsed)
 	player:render(ctx)
 
@@ -19,8 +26,4 @@ function update(ctx: Context, dt: number, elapsed: number)
 	ctx.scene:batch_model("cube", Transform.new(Vec3.new(-2, 2, -2)))
 	ctx.scene:batch_model("cube", Transform.new(Vec3.new(2, -2, 1)))
 	ctx.scene:batch_model("cube", Transform.new(Vec3.new(-3, -2, 3)))
-
-	if ctx.scene.camera.transform.pos.x > 0 then
-		ctx.scene.camera.transform.pos.x -= dt
-	end
 end

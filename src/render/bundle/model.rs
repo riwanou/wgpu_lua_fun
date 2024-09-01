@@ -1,7 +1,6 @@
 use std::{collections::HashMap, mem};
 
-use bytemuck::{Pod, Zeroable};
-use encase::ShaderType;
+use bytemuck::{cast_slice, Pod, Zeroable};
 use glam::{Mat3, Mat4, Quat};
 use log::info;
 use wgpu::util::DeviceExt;
@@ -9,6 +8,7 @@ use wgpu::util::DeviceExt;
 use crate::render::{
     mesh::{MeshAssets, VertexTrait},
     shader::ShaderAssets,
+    texture::Texture,
 };
 
 use super::Layouts;
@@ -69,24 +69,19 @@ impl VertexTrait for Vertex {
     }
 }
 
-#[derive(ShaderType)]
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Instance {
-    pub world_local: Mat4,
-    pub normal: Mat3,
+    pub world_local: [[f32; 4]; 4],
+    pub normal: [[f32; 3]; 3],
 }
 
 impl Instance {
     pub fn new(transform: Mat4, rotation: Quat) -> Self {
         Self {
-            world_local: transform,
-            normal: Mat3::from_quat(rotation),
+            world_local: transform.to_cols_array_2d(),
+            normal: Mat3::from_quat(rotation).to_cols_array_2d(),
         }
-    }
-
-    fn slice_as_bytes(instances: &[Instance]) -> Vec<u8> {
-        let mut buffer = encase::StorageBuffer::new(Vec::<u8>::new());
-        buffer.write(instances).unwrap();
-        buffer.into_inner()
     }
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -135,7 +130,7 @@ impl Batches {
             instances.buffer = Some(device.create_buffer_init(
                 &wgpu::util::BufferInitDescriptor {
                     label: Some("model_instance"),
-                    contents: &Instance::slice_as_bytes(&instances.data),
+                    contents: cast_slice(&instances.data),
                     usage: wgpu::BufferUsages::VERTEX,
                 },
             ))
@@ -214,7 +209,14 @@ impl Pipeline {
                     })],
                 }),
                 primitive: wgpu::PrimitiveState::default(),
-                depth_stencil: None,
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: Texture::DEPTH_FORMAT,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+
                 multisample: wgpu::MultisampleState::default(),
                 multiview: None,
                 cache: None,
