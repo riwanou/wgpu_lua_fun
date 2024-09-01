@@ -11,9 +11,8 @@ encase = { version = "0.9.0", features = ["glam"] }
 env_logger = "0.11.5"
 glam = { version = "0.28.0", features = ["serde"] }
 log = "0.4.22"
-mlua = { version = "0.9.9", features = ["luau", "serialize"] }
+mlua = { version = "0.9.9", features = ["luau"] }
 pollster = "0.3.0"
-serde = { version = "1.0.209", features = ["derive"] }
 threadpool = "1.8.1"
 tobj = "4.0.2"
 wgpu = { version = "22.1.0", default-features = false, features = ["metal", "wgsl"] }

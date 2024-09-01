@@ -4,13 +4,12 @@ use anyhow::Result;
 use assets_manager::{loader, Asset, AssetCache};
 use log::error;
 use mlua::{Compiler, Function, Lua};
-use register::register_types_globals;
-use shared::Shared;
+use register::{create_scoped_context, register_types_globals};
 
 use crate::{app::RELOAD_DEBOUNCE, render::state::RenderState, scene::Scene};
 
 mod register;
-pub mod shared;
+mod utils;
 
 const SCRIPTS_DIR: &str = "assets/scripts";
 
@@ -38,15 +37,11 @@ pub struct LuaState {
 impl LuaState {
     /// Load lua script entrypoint, will get hot-reloaded.
     /// This should contains a global update and init function.
-    pub fn new(
-        entry_point: &str,
-        scene: Shared<Scene>,
-        render_state: Shared<RenderState>,
-    ) -> Self {
+    pub fn new(entry_point: &str) -> Self {
         let lua = Lua::new();
         lua.set_compiler(Compiler::new().set_type_info_level(1));
 
-        register_types_globals(&lua, render_state, scene).unwrap();
+        register_types_globals(&lua).unwrap();
 
         let cache = AssetCache::new(SCRIPTS_DIR).unwrap();
         {
@@ -63,12 +58,18 @@ impl LuaState {
         }
     }
 
-    pub fn init(&mut self) -> Result<()> {
-        let result: mlua::Result<()> = (|| {
+    pub fn init(
+        &mut self,
+        render_state: &mut RenderState,
+        scene: &mut Scene,
+    ) -> Result<()> {
+        let result = self.lua.scope(|scope| {
             let init_fn = self.lua.globals().get::<_, Function>("init")?;
-            init_fn.call::<_, ()>(())?;
+            let ctx =
+                create_scoped_context(&self.lua, scope, render_state, scene)?;
+            init_fn.call::<_, ()>(ctx)?;
             Ok(())
-        })();
+        });
         if let Err(err) = result {
             error!("init\n{}", err);
         }
@@ -95,7 +96,13 @@ impl LuaState {
         Ok(None)
     }
 
-    pub fn update(&mut self, delta_sec: f32, elapsed_sec: f32) -> Result<()> {
+    pub fn update(
+        &mut self,
+        render_state: &mut RenderState,
+        scene: &mut Scene,
+        delta_sec: f32,
+        elapsed_sec: f32,
+    ) -> Result<()> {
         self.cache.hot_reload();
         let handle = self.cache.load_expect::<LuauScript>(&self.entry_point);
 
@@ -113,11 +120,13 @@ impl LuaState {
             return Ok(());
         }
 
-        let result: mlua::Result<()> = (|| {
+        let result = self.lua.scope(|scope| {
             let update_fn = self.lua.globals().get::<_, Function>("update")?;
-            update_fn.call::<_, ()>((delta_sec, elapsed_sec))?;
+            let ctx =
+                create_scoped_context(&self.lua, scope, render_state, scene)?;
+            update_fn.call::<_, ()>((ctx, delta_sec, elapsed_sec))?;
             Ok(())
-        })();
+        });
         if let Err(err) = result {
             if !self.update_got_error {
                 self.update_got_error = true;

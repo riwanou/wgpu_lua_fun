@@ -16,9 +16,7 @@ declare Vec3: {
 declare class Transform
   pos: Vec3
   scale: Vec3
-  function rotate_x(self, angle: number): ()
-  function rotate_y(self, angle: number): ()
-  function rotate_z(self, angle: number): ()
+  function rotate(self, axis: Vec3, angle: number): ()
 end
 
 declare Transform: {
@@ -30,11 +28,18 @@ declare class Camera
 	fovy: number
 end
 
-declare game: {
-  camera: Camera,
-  load_mesh: (mesh_id: string) -> (),
-  render_model: (mesh_id: string, transform: Transform) -> (),
+declare class Scene
+  camera: Camera
+  function batch_model(self, mesh_id: string, transform: Transform): ()
+end
+
+declare class Graphics
+  function load_mesh(self, mesh_id: string): ()
+end
+
+export type Context = {
+  scene: Scene,
+  graphics: Graphics,
 }
 
-declare entities: { [string]: any }
 declare function entity(id: string): any

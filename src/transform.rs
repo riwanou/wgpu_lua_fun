@@ -1,21 +1,19 @@
 use glam::{Mat3, Mat4, Quat, Vec3};
 
-use crate::lua::shared::Shared;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Transform {
-    pub pos: Shared<Vec3>,
+    pub pos: Vec3,
     pub rot: Quat,
-    pub scale: Shared<Vec3>,
+    pub scale: Vec3,
     pub up: Vec3,
 }
 
 impl Default for Transform {
     fn default() -> Self {
         Self {
-            pos: Shared::new(Vec3::ZERO),
+            pos: Vec3::ZERO,
             rot: Quat::IDENTITY,
-            scale: Shared::new(Vec3::splat(1.0)),
+            scale: Vec3::splat(1.0),
             up: Vec3::Y,
         }
     }
@@ -23,14 +21,10 @@ impl Default for Transform {
 
 impl Transform {
     pub fn build_matrix(&self) -> Mat4 {
-        Mat4::from_scale_rotation_translation(
-            *self.scale.borrow(),
-            self.rot,
-            *self.pos.borrow(),
-        )
+        Mat4::from_scale_rotation_translation(self.scale, self.rot, self.pos)
     }
 
-    pub fn from_pos(pos: Shared<Vec3>) -> Self {
+    pub fn from_pos(pos: Vec3) -> Self {
         Self {
             pos,
             ..Default::default()
@@ -54,7 +48,7 @@ impl Transform {
     }
 
     pub fn look_at(&mut self, target: Vec3) {
-        let forward = (*self.pos.borrow() - target).normalize();
+        let forward = (self.pos - target).normalize();
         self.look_to(forward);
     }
 

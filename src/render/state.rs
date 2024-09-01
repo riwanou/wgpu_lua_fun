@@ -101,7 +101,7 @@ impl RenderState {
             &self.queue,
             &self.config,
             elapsed,
-            &scene.camera.borrow(),
+            &scene.camera,
         );
         scene.prepare(&self.device);
 

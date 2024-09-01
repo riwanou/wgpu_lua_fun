@@ -1,15 +1,12 @@
 use std::fmt;
 
-use crate::{
-    lua::shared::Shared,
-    render::{
-        bundle::model::{self, Batches},
-        camera::Camera,
-    },
+use crate::render::{
+    bundle::model::{self, Batches},
+    camera::Camera,
 };
 
 pub struct Scene {
-    pub camera: Shared<Camera>,
+    pub camera: Camera,
     pub model_batches: model::Batches,
 }
 
@@ -22,7 +19,7 @@ impl fmt::Debug for Scene {
 impl Scene {
     pub fn new() -> Self {
         Self {
-            camera: Shared::new(Camera::new()),
+            camera: Camera::new(),
             model_batches: Batches::default(),
         }
     }
