@@ -53,6 +53,9 @@ fn register_vec3(lua: &Lua) -> Result<()> {
             Ok(AnyUserData::wrap(Vec3::splat(val)))
         })?,
     )?;
+    table.set("X", AnyUserData::wrap(Vec3::X))?;
+    table.set("Y", AnyUserData::wrap(Vec3::Y))?;
+    table.set("Z", AnyUserData::wrap(Vec3::Z))?;
     lua.globals().set("Vec3", table)?;
     Ok(())
 }
@@ -133,16 +136,18 @@ fn register_render_state(lua: &Lua) -> Result<()> {
     Ok(())
 }
 
-fn register_entities(lua: &Lua) -> Result<()> {
-    lua.globals().set("entities", lua.create_table()?)?;
+fn register_cached_tables(lua: &Lua) -> Result<()> {
+    lua.set_named_registry_value("cached_tables", lua.create_table()?)?;
     lua.globals().set(
-        "entity",
+        "cached_table",
         lua.create_function(|lua, id: String| {
-            let entities = lua.globals().raw_get::<_, Table>("entities")?;
-            if !entities.contains_key(id.clone())? {
-                entities.raw_set(id.clone(), lua.create_table()?.clone())?;
+            let cached_tables =
+                lua.named_registry_value::<Table>("cached_tables")?;
+            if !cached_tables.contains_key(id.clone())? {
+                cached_tables
+                    .raw_set(id.clone(), lua.create_table()?.clone())?;
             }
-            entities.raw_get::<_, Table>(id)
+            cached_tables.raw_get::<_, Table>(id)
         })?,
     )?;
 
@@ -167,7 +172,7 @@ pub fn register_types_globals(lua: &Lua) -> Result<()> {
     register_camera(lua)?;
     register_scene(lua)?;
     register_render_state(lua)?;
-    register_entities(lua)?;
+    register_cached_tables(lua)?;
 
     lua.globals().set(
         "print",

@@ -9,6 +9,9 @@ declare class Vec3
 end
 
 declare Vec3: {
+  X: Vec3,
+  Y: Vec3,
+  Z: Vec3,
   new: (x: number, y: number, z: number) -> Vec3,
   splat: (val: number) -> Vec3,
 }
@@ -42,4 +45,4 @@ export type Context = {
   graphics: Graphics,
 }
 
-declare function entity(id: string): any
+declare function cached_table(id: string): any
