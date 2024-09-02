@@ -88,9 +88,17 @@ impl App {
         let delta_sec = delta.as_secs_f32();
         let elapsed_sec = self.elapsed.as_secs_f32();
 
+        self.inputs.update();
         let render_state = self.render_state.as_mut().unwrap();
-
         self.scene.begin_frame();
+
+        if self.inputs.key_just_pressed(KeyCode::Escape) {
+            self.proxy.send_event(UserEvent::ExitApp)?;
+        }
+        if self.inputs.key_just_pressed(KeyCode::KeyR) {
+            self.lua.init(&mut self.scene, &self.inputs, render_state)?;
+        }
+
         self.lua.update(
             &mut self.scene,
             &self.inputs,
@@ -98,14 +106,6 @@ impl App {
             delta_sec,
             elapsed_sec,
         )?;
-
-        self.inputs.update();
-        if self.inputs.key_just_pressed(KeyCode::Escape) {
-            self.proxy.send_event(UserEvent::ExitApp)?;
-        }
-        if self.inputs.key_just_pressed(KeyCode::KeyR) {
-            self.lua.init(&mut self.scene, &self.inputs, render_state)?;
-        }
 
         render_state.hot_reload();
         render_state.render(elapsed_sec, &mut self.scene);
@@ -159,6 +159,11 @@ impl ApplicationHandler<UserEvent> for App {
             WindowEvent::RedrawRequested => {
                 self.update().unwrap();
                 self.window().request_redraw();
+            }
+            WindowEvent::Focused(is_focused) => {
+                if !is_focused {
+                    self.inputs.focus_out();
+                }
             }
             _ => (),
         }

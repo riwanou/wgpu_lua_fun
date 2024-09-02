@@ -84,4 +84,9 @@ impl Inputs {
             self.handle_event(event);
         }
     }
+
+    pub fn focus_out(&mut self) {
+        self.keys_state = [false; 256];
+        self.last_keys_state = [false; 256];
+    }
 }
