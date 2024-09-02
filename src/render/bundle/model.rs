@@ -208,7 +208,7 @@ impl Layout {
                 label: Some("model_layout"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
-                        binding: 1,
+                        binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             sample_type: wgpu::TextureSampleType::default(),
@@ -218,7 +218,7 @@ impl Layout {
                         count: None,
                     },
                     wgpu::BindGroupLayoutEntry {
-                        binding: 2,
+                        binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(
                             wgpu::SamplerBindingType::Filtering,
@@ -240,11 +240,11 @@ impl Layout {
             layout: &self.layout,
             entries: &[
                 wgpu::BindGroupEntry {
-                    binding: 1,
+                    binding: 0,
                     resource: wgpu::BindingResource::TextureView(&texture.view),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 2,
+                    binding: 1,
                     resource: wgpu::BindingResource::Sampler(&texture.sampler),
                 },
             ],

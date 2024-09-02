@@ -9,7 +9,7 @@ var<uniform> globals: Globals;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
-    @location(1) tex_coords: vec2<f32>,
+    @location(1) tex_coord: vec2<f32>,
     @location(2) normal: vec3<f32>,
 }
 
@@ -51,7 +51,7 @@ fn vs_main(model: VertexInput, instance: InstanceInput) -> VertexOutput {
 
     var out: VertexOutput;
 
-    out.tex_coords = model.tex_coords;
+    out.tex_coords = model.tex_coord;
     out.world_normal = normal_rotation * model.normal;
 
     let world_position = world_local * vec4<f32>(model.position, 1.0);
@@ -68,6 +68,6 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // let val = map(cos(globals.elapsed), -1.0, 1.0, 0.1, 0.4);
-    return vec4<f32>(in.world_normal, 1.0);
+    let diffuse_sample = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    return vec4<f32>(diffuse_sample.xyz, 1.0);
 }
