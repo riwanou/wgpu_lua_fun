@@ -115,10 +115,17 @@ fn register_scene_methods_mut<T: std::borrow::BorrowMut<Scene> + fmt::Debug>(
     register_getters!(reg, T, {}, userdata: { camera: Camera });
     reg.add_method_mut(
         "batch_model",
-        |_, this, (mesh_id, transform): (String, UserDataRef<Transform>)| {
+        |_,
+         this,
+         (mesh_id, texture_id, transform): (
+            String,
+            Option<String>,
+            UserDataRef<Transform>,
+        )| {
             this.borrow_mut().model_batches.add_model(
                 mesh_id,
-                model::DEFAULT_DIFFUSE_TEXTURE.to_string(),
+                texture_id
+                    .unwrap_or(model::DEFAULT_DIFFUSE_TEXTURE.to_string()),
                 model::Instance::new(transform.build_matrix(), transform.rot),
             );
             Ok(())

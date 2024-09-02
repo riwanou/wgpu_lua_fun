@@ -33,7 +33,7 @@ end
 
 declare class Scene
   camera: Camera
-  function batch_model(self, mesh_id: string, transform: Transform): ()
+  function batch_model(self, mesh_id: string, texture_id: string?, transform: Transform): ()
 end
 
 declare class Graphics

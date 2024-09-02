@@ -7,7 +7,9 @@ function init(ctx: Context)
 		ctx.graphics:load_mesh(mesh_id)
 	end
 
-	ctx.graphics:load_texture("blue_nebula")
+	for _, texture_id in { "blue_nebula", "dragon" } do
+		ctx.graphics:load_texture(texture_id)
+	end
 
 	player:init()
 	ctx.scene.camera.transform.pos = Vec3.new(0.5, 0, 10)
@@ -24,8 +26,8 @@ function update(ctx: Context, dt: number, elapsed: number)
 	player:update(dt, elapsed)
 	player:render(ctx)
 
-	ctx.scene:batch_model("cube", Transform.new(Vec3.new(2, 2, -10)))
-	ctx.scene:batch_model("cube", Transform.new(Vec3.new(-2, 2, -2)))
-	ctx.scene:batch_model("cube", Transform.new(Vec3.new(2, -2, 1)))
-	ctx.scene:batch_model("cube", Transform.new(Vec3.new(-3, -2, 3)))
+	ctx.scene:batch_model("cube", nil, Transform.new(Vec3.new(2, 2, -10)))
+	ctx.scene:batch_model("cube", "blue_nebula", Transform.new(Vec3.new(-2, 2, -2)))
+	ctx.scene:batch_model("cube", "dragon", Transform.new(Vec3.new(2, -2, 1)))
+	ctx.scene:batch_model("cube", nil, Transform.new(Vec3.new(-3, -2, 3)))
 end
