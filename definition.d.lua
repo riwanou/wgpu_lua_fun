@@ -38,6 +38,7 @@ end
 
 declare class Graphics
   function load_mesh(self, mesh_id: string): ()
+  function load_texture(self, texture_id: string): ()
 end
 
 export type Context = {

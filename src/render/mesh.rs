@@ -101,7 +101,6 @@ impl MeshAssets {
             if self.last_reload.elapsed() >= RELOAD_DEBOUNCE
                 && handle.reloaded_global()
             {
-                info!("Mesh reloaded: {}", mesh_id);
                 self.last_reload = Instant::now();
                 self.load_internal(&mesh_id);
             }

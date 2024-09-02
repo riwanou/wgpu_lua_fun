@@ -132,6 +132,10 @@ fn register_render_state(lua: &Lua) -> Result<()> {
             this.meshes.load(&mesh_id);
             Ok(())
         });
+        reg.add_method_mut("load_texture", |_, this, texture_id: String| {
+            this.textures.load(&texture_id);
+            Ok(())
+        });
     })?;
     Ok(())
 }

@@ -8,7 +8,7 @@ use super::{
     bundle::{Bundles, Layouts},
     mesh::MeshAssets,
     shader::ShaderAssets,
-    texture::Texture,
+    texture::{Texture, TextureAssets},
 };
 
 pub struct RenderState {
@@ -23,6 +23,7 @@ pub struct RenderState {
     queue: wgpu::Queue,
     shaders: ShaderAssets,
     surface: wgpu::Surface<'static>,
+    pub textures: TextureAssets,
 }
 
 impl fmt::Debug for RenderState {
@@ -52,6 +53,7 @@ impl RenderState {
         surface.configure(&device, &config);
 
         let mut shaders = ShaderAssets::new();
+        let textures = TextureAssets::new();
         let meshes = MeshAssets::new();
         let layouts = Layouts::new(&device);
         let bundles = Bundles::new(&device, &config, &layouts, &mut shaders);
@@ -69,12 +71,14 @@ impl RenderState {
             queue,
             shaders,
             surface,
+            textures,
         }
     }
 
     pub fn hot_reload(&mut self) {
         self.shaders.hot_reload();
         self.meshes.hot_reload(&self.device);
+        self.textures.hot_reload(&self.device, &self.queue);
         self.bundles.hot_reload(
             &self.device,
             &self.config,

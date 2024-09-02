@@ -7,6 +7,8 @@ function init(ctx: Context)
 		ctx.graphics:load_mesh(mesh_id)
 	end
 
+	ctx.graphics:load_texture("blue_nebula")
+
 	player:init()
 	ctx.scene.camera.transform.pos = Vec3.new(0.5, 0, 10)
 end
