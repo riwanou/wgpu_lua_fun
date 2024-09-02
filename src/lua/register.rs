@@ -3,22 +3,19 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use anyhow::Result;
 use glam::Vec3;
 use log::info;
 use mlua::{
-    AnyUserData, Function, Lua, MetaMethod, Scope, Table, UserDataFields,
-    UserDataMethods, UserDataRef, UserDataRegistry, Variadic,
+    AnyUserData, Error, Function, Lua, MetaMethod, Result, Scope, Table,
+    UserDataFields, UserDataMethods, UserDataRef, UserDataRegistry, Value,
+    Variadic,
 };
 
 use crate::{
+    input::Inputs,
     register_fields, register_getters, register_methods_mut,
     register_to_string,
-    render::{
-        bundle::model::{self},
-        camera::Camera,
-        state::RenderState,
-    },
+    render::{bundle::model, camera::Camera, state::RenderState},
     scene::Scene,
     transform::Transform,
 };
@@ -31,8 +28,26 @@ fn register_vec3_methods_mut<T: std::borrow::BorrowMut<Vec3> + fmt::Debug>(
     let mut reg_meta_op = |method: MetaMethod, op: fn(Vec3, Vec3) -> Vec3| {
         reg.add_meta_function(
             method,
-            move |_, (this, other): (UserDataRef<Vec3>, UserDataRef<Vec3>)| {
-                Ok(AnyUserData::wrap(op(*this, *other)))
+            move |_, (this, other): (UserDataRef<T>, Value)| {
+                let this = this.borrow();
+                let to_vec3 = |value: f32| Vec3::splat(value);
+                let result = match other {
+                    Value::UserData(other) => {
+                        let other = match other.borrow::<Vec3>() {
+                            Ok(borrowed) => *borrowed,
+                            Err(_) => **other.borrow::<&mut Vec3>()?,
+                        };
+                        op(*this, other)
+                    }
+                    Value::Number(other) => op(*this, to_vec3(other as f32)),
+                    Value::Integer(other) => op(*this, to_vec3(other as f32)),
+                    _ => {
+                        return Err(Error::runtime(
+                            "Invalid operand type for Vec3",
+                        ))
+                    }
+                };
+                Ok(AnyUserData::wrap(result))
             },
         );
     };
@@ -60,8 +75,7 @@ fn register_vec3(lua: &Lua) -> Result<()> {
     table.set("X", AnyUserData::wrap(Vec3::X))?;
     table.set("Y", AnyUserData::wrap(Vec3::Y))?;
     table.set("Z", AnyUserData::wrap(Vec3::Z))?;
-    lua.globals().set("Vec3", table)?;
-    Ok(())
+    lua.globals().set("Vec3", table)
 }
 
 fn register_transform_methods_mut<
@@ -89,8 +103,7 @@ fn register_transform(lua: &Lua) -> Result<()> {
             Ok(AnyUserData::wrap(Transform::from_pos(*pos)))
         })?,
     )?;
-    lua.globals().set("Transform", table)?;
-    Ok(())
+    lua.globals().set("Transform", table)
 }
 
 fn register_camera_methods_mut<
@@ -102,10 +115,7 @@ fn register_camera_methods_mut<
 }
 
 fn register_camera(lua: &Lua) -> Result<()> {
-    {
-        lua.register_userdata_type::<Camera>(register_camera_methods_mut)?;
-        lua.register_userdata_type::<&mut Camera>(register_camera_methods_mut)?;
-    };
+    register_methods_mut!(lua, Camera, register_camera_methods_mut);
     Ok(())
 }
 
@@ -138,6 +148,17 @@ fn register_scene(lua: &Lua) -> Result<()> {
     Ok(())
 }
 
+fn register_inputs(lua: &Lua) -> Result<()> {
+    lua.register_userdata_type::<Inputs>(|reg| {
+        reg.add_method("pressed", |_, this, action: String| {
+            Ok(this.action_pressed(&action))
+        });
+        reg.add_method("just_pressed", |_, this, action: String| {
+            Ok(this.action_just_pressed(&action))
+        });
+    })
+}
+
 fn register_render_state(lua: &Lua) -> Result<()> {
     lua.register_userdata_type::<RenderState>(|reg| {
         reg.add_method_mut("load_mesh", |_, this, mesh_id: String| {
@@ -148,8 +169,7 @@ fn register_render_state(lua: &Lua) -> Result<()> {
             this.textures.load(&texture_id);
             Ok(())
         });
-    })?;
-    Ok(())
+    })
 }
 
 fn register_cached_tables(lua: &Lua) -> Result<()> {
@@ -165,20 +185,20 @@ fn register_cached_tables(lua: &Lua) -> Result<()> {
             }
             cached_tables.raw_get::<_, Table>(id)
         })?,
-    )?;
-
-    Ok(())
+    )
 }
 
 pub fn create_scoped_context<'scope>(
     lua: &'scope Lua,
     scope: &Scope<'_, 'scope>,
-    render_state: &'scope mut RenderState,
     scene: &'scope mut Scene,
-) -> mlua::Result<Table<'scope>> {
+    inputs: &'scope Inputs,
+    render_state: &'scope mut RenderState,
+) -> Result<Table<'scope>> {
     let ctx = lua.create_table()?;
-    ctx.set("graphics", scope.create_any_userdata_ref_mut(render_state)?)?;
     ctx.set("scene", scope.create_any_userdata_ref_mut(scene)?)?;
+    ctx.set("inputs", scope.create_any_userdata_ref(inputs)?)?;
+    ctx.set("graphics", scope.create_any_userdata_ref_mut(render_state)?)?;
     Ok(ctx)
 }
 
@@ -187,18 +207,17 @@ pub fn register_types_globals(lua: &Lua) -> Result<()> {
     register_transform(lua)?;
     register_camera(lua)?;
     register_scene(lua)?;
+    register_inputs(lua)?;
     register_render_state(lua)?;
     register_cached_tables(lua)?;
 
     lua.globals().set(
         "print",
-        Function::wrap(|_, vals: Variadic<mlua::Value>| {
+        Function::wrap(|_, vals: Variadic<Value>| {
             let args: Vec<String> =
                 vals.iter().map(|val| val.to_string().unwrap()).collect();
             info!("{}", args.join(", "));
             Ok(())
         }),
-    )?;
-
-    Ok(())
+    )
 }

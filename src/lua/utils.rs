@@ -10,7 +10,7 @@ macro_rules! unsafe_mut_field {
             (&mut $struct_ref.$field as *mut $type_name)
                 .as_mut()
                 .ok_or_else(|| {
-                    mlua::Error::RuntimeError(format!(
+                    mlua::Error::runtime(format!(
                         "Dead parent for field {} in type {}",
                         stringify!($field),
                         stringify!($type_name)

@@ -2,10 +2,10 @@ declare class Vec3
   x: number
   y: number
   z: number
-  function __add(self, other: Vec3): Vec3
-  function __sub(self, other: Vec3): Vec3
-  function __mul(self, other: Vec3): Vec3
-  function __div(self, other: Vec3): Vec3
+  function __add(self, other: Vec3 | number): Vec3
+  function __sub(self, other: Vec3 | number): Vec3
+  function __mul(self, other: Vec3 | number): Vec3
+  function __div(self, other: Vec3 | number): Vec3
 end
 
 declare Vec3: {
@@ -36,6 +36,13 @@ declare class Scene
   function batch_model(self, mesh_id: string, texture_id: string?, transform: Transform): ()
 end
 
+type Action = "forward" | "backward" | "right" | "left" | "up" | "down"
+
+declare class Inputs
+  function pressed(self, action: Action): boolean
+  function just_pressed(self, action: Action): boolean
+end
+
 declare class Graphics
   function load_mesh(self, mesh_id: string): ()
   function load_texture(self, texture_id: string): ()
@@ -43,6 +50,7 @@ end
 
 export type Context = {
   scene: Scene,
+  inputs: Inputs,
   graphics: Graphics,
 }
 

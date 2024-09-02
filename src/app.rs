@@ -62,10 +62,22 @@ impl App {
     }
 
     pub fn init(&mut self) -> Result<()> {
+        self.inputs.register_action("forward", vec![KeyCode::KeyW]);
+        self.inputs.register_action("backward", vec![KeyCode::KeyS]);
+        self.inputs.register_action("left", vec![KeyCode::KeyA]);
+        self.inputs.register_action("right", vec![KeyCode::KeyD]);
+        self.inputs.register_action("up", vec![KeyCode::Space]);
+        self.inputs
+            .register_action("down", vec![KeyCode::ShiftLeft]);
+
         self.render_state =
             Some(pollster::block_on(RenderState::new(self.window())));
-        self.lua
-            .init(self.render_state.as_mut().unwrap(), &mut self.scene)?;
+        self.lua.init(
+            &mut self.scene,
+            &self.inputs,
+            self.render_state.as_mut().unwrap(),
+        )?;
+
         Ok(())
     }
 
@@ -80,18 +92,19 @@ impl App {
 
         self.scene.begin_frame();
         self.lua.update(
-            render_state,
             &mut self.scene,
+            &self.inputs,
+            render_state,
             delta_sec,
             elapsed_sec,
         )?;
 
         self.inputs.update();
-        if self.inputs.key_pressed(KeyCode::Escape) {
+        if self.inputs.key_just_pressed(KeyCode::Escape) {
             self.proxy.send_event(UserEvent::ExitApp)?;
         }
-        if self.inputs.key_pressed(KeyCode::KeyR) {
-            self.lua.init(render_state, &mut self.scene)?;
+        if self.inputs.key_just_pressed(KeyCode::KeyR) {
+            self.lua.init(&mut self.scene, &self.inputs, render_state)?;
         }
 
         render_state.hot_reload();

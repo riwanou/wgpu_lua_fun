@@ -6,7 +6,10 @@ use log::error;
 use mlua::{Compiler, Function, Lua};
 use register::{create_scoped_context, register_types_globals};
 
-use crate::{app::RELOAD_DEBOUNCE, render::state::RenderState, scene::Scene};
+use crate::{
+    app::RELOAD_DEBOUNCE, input::Inputs, render::state::RenderState,
+    scene::Scene,
+};
 
 mod register;
 mod utils;
@@ -60,13 +63,19 @@ impl LuaState {
 
     pub fn init(
         &mut self,
-        render_state: &mut RenderState,
         scene: &mut Scene,
+        inputs: &Inputs,
+        render_state: &mut RenderState,
     ) -> Result<()> {
         let result = self.lua.scope(|scope| {
             let init_fn = self.lua.globals().get::<_, Function>("init")?;
-            let ctx =
-                create_scoped_context(&self.lua, scope, render_state, scene)?;
+            let ctx = create_scoped_context(
+                &self.lua,
+                scope,
+                scene,
+                inputs,
+                render_state,
+            )?;
             init_fn.call::<_, ()>(ctx)?;
             Ok(())
         });
@@ -98,8 +107,9 @@ impl LuaState {
 
     pub fn update(
         &mut self,
-        render_state: &mut RenderState,
         scene: &mut Scene,
+        inputs: &Inputs,
+        render_state: &mut RenderState,
         delta_sec: f32,
         elapsed_sec: f32,
     ) -> Result<()> {
@@ -122,8 +132,13 @@ impl LuaState {
 
         let result = self.lua.scope(|scope| {
             let update_fn = self.lua.globals().get::<_, Function>("update")?;
-            let ctx =
-                create_scoped_context(&self.lua, scope, render_state, scene)?;
+            let ctx = create_scoped_context(
+                &self.lua,
+                scope,
+                scene,
+                inputs,
+                render_state,
+            )?;
             update_fn.call::<_, ()>((ctx, delta_sec, elapsed_sec))?;
             Ok(())
         });

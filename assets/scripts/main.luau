@@ -15,13 +15,32 @@ function init(ctx: Context)
 	ctx.scene.camera.transform.pos = Vec3.new(0.5, 0, 10)
 end
 
-function update_camera(camera: Camera, dt: number) end
+function update_camera(camera: Camera, inputs: Inputs, dt: number)
+	local direction = Vec3.splat(0)
+	if inputs:pressed("forward") then
+		direction.z -= 1
+	end
+	if inputs:pressed("backward") then
+		direction.z += 1
+	end
+	if inputs:pressed("left") then
+		direction.x -= 1
+	end
+	if inputs:pressed("right") then
+		direction.x += 1
+	end
+	if inputs:pressed("down") then
+		direction.y -= 1
+	end
+	if inputs:pressed("up") then
+		direction.y += 1
+	end
+
+	camera.transform.pos += direction * 15 * dt
+end
 
 function update(ctx: Context, dt: number, elapsed: number)
-	local camera = ctx.scene.camera
-	if camera.transform.pos.x > 0 then
-		camera.transform.pos.x -= dt
-	end
+	update_camera(ctx.scene.camera, ctx.inputs, dt)
 
 	player:update(dt, elapsed)
 	player:render(ctx)
