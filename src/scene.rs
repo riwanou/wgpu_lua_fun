@@ -1,8 +1,12 @@
 use std::fmt;
 
 use crate::render::{
-    bundle::model::{self, Batches},
+    bundle::{
+        model::{self, Batches},
+        Layouts,
+    },
     camera::Camera,
+    texture::TextureAssets,
 };
 
 pub struct Scene {
@@ -28,7 +32,12 @@ impl Scene {
         self.model_batches.clear();
     }
 
-    pub fn prepare(&mut self, device: &wgpu::Device) {
-        self.model_batches.prepare(device);
+    pub fn prepare(
+        &mut self,
+        device: &wgpu::Device,
+        layouts: &Layouts,
+        textures: &TextureAssets,
+    ) {
+        self.model_batches.prepare(device, layouts, textures);
     }
 }

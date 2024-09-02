@@ -53,10 +53,16 @@ impl RenderState {
         surface.configure(&device, &config);
 
         let mut shaders = ShaderAssets::new();
-        let textures = TextureAssets::new();
+        let mut textures = TextureAssets::new();
         let meshes = MeshAssets::new();
         let layouts = Layouts::new(&device);
-        let bundles = Bundles::new(&device, &config, &layouts, &mut shaders);
+        let bundles = Bundles::new(
+            &device,
+            &config,
+            &layouts,
+            &mut shaders,
+            &mut textures,
+        );
         let depth = Texture::create_depth(&device, &config);
 
         Self {
@@ -112,7 +118,7 @@ impl RenderState {
             elapsed,
             &scene.camera,
         );
-        scene.prepare(&self.device);
+        scene.prepare(&self.device, &self.layouts, &self.textures);
 
         {
             let mut rpass =

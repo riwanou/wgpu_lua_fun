@@ -8,10 +8,12 @@ use wgpu::util::DeviceExt;
 use crate::render::{
     mesh::{MeshAssets, VertexTrait},
     shader::ShaderAssets,
-    texture::Texture,
+    texture::{Texture, TextureAssets},
 };
 
 use super::Layouts;
+
+pub const DEFAULT_DIFFUSE_TEXTURE: &str = "white";
 
 pub struct Bundle {
     pub pipeline: Pipeline,
@@ -23,7 +25,9 @@ impl Bundle {
         config: &wgpu::SurfaceConfiguration,
         layouts: &Layouts,
         shaders: &mut ShaderAssets,
+        textures: &mut TextureAssets,
     ) -> Self {
+        textures.load(DEFAULT_DIFFUSE_TEXTURE);
         Self {
             pipeline: Pipeline::new(device, config, layouts, shaders),
         }
@@ -104,29 +108,53 @@ impl Instance {
 
 #[derive(Default)]
 struct InstanceArray {
-    data: Vec<Instance>,
     buffer: Option<wgpu::Buffer>,
+    data: Vec<Instance>,
+}
+
+#[derive(Hash, PartialEq, Eq)]
+struct Key {
+    mesh_id: String,
+    texture_id: String,
 }
 
 #[derive(Default)]
 pub struct Batches {
-    instances: HashMap<String, InstanceArray>,
+    bind_groups: HashMap<String, wgpu::BindGroup>,
+    instances: HashMap<Key, InstanceArray>,
 }
 
 impl Batches {
-    pub fn add_model(&mut self, mesh_id: String, instance: Instance) {
-        self.instances
-            .entry(mesh_id)
-            .or_default()
-            .data
-            .push(instance);
+    pub fn add_model(
+        &mut self,
+        mesh_id: String,
+        texture_id: String,
+        instance: Instance,
+    ) {
+        let key = Key {
+            mesh_id,
+            texture_id,
+        };
+        self.instances.entry(key).or_default().data.push(instance);
     }
 
-    pub fn prepare(&mut self, device: &wgpu::Device) {
-        for instances in self.instances.values_mut() {
+    pub fn prepare(
+        &mut self,
+        device: &wgpu::Device,
+        layouts: &Layouts,
+        textures: &TextureAssets,
+    ) {
+        for (key, instances) in &mut self.instances {
             if instances.data.is_empty() {
                 continue;
             }
+
+            if let Some(texture) = textures.get(&key.texture_id) {
+                self.bind_groups
+                    .entry(key.texture_id.clone())
+                    .or_insert_with(|| layouts.model.bind(device, texture));
+            }
+
             instances.buffer = Some(device.create_buffer_init(
                 &wgpu::util::BufferInitDescriptor {
                     label: Some("model_instance"),
@@ -138,15 +166,18 @@ impl Batches {
     }
 
     pub fn render(&self, rpass: &mut wgpu::RenderPass, meshes: &MeshAssets) {
-        for (mesh_id, instances) in &self.instances {
+        for (key, instances) in &self.instances {
             if instances.data.is_empty() {
                 continue;
             }
-            let (Some(mesh), Some(instances_buffer)) =
-                (meshes.get(mesh_id), &instances.buffer)
-            else {
+            let (Some(mesh), Some(bind_group), Some(instances_buffer)) = (
+                meshes.get(&key.mesh_id),
+                self.bind_groups.get(&key.texture_id),
+                &instances.buffer,
+            ) else {
                 continue;
             };
+            rpass.set_bind_group(1, bind_group, &[]);
             rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 mesh.index_buffer.slice(..),
@@ -163,6 +194,61 @@ impl Batches {
 
     pub fn clear(&mut self) {
         self.instances.clear();
+    }
+}
+
+pub struct Layout {
+    pub layout: wgpu::BindGroupLayout,
+}
+
+impl Layout {
+    pub fn new(device: &wgpu::Device) -> Self {
+        let layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("model_layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::default(),
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(
+                            wgpu::SamplerBindingType::Filtering,
+                        ),
+                        count: None,
+                    },
+                ],
+            });
+        Self { layout }
+    }
+
+    pub fn bind(
+        &self,
+        device: &wgpu::Device,
+        texture: &Texture,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("model_bind_group"),
+            layout: &self.layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&texture.sampler),
+                },
+            ],
+        })
     }
 }
 
@@ -184,7 +270,10 @@ impl Pipeline {
         let pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("model_layout"),
-                bind_group_layouts: &[&layouts.globals.layout],
+                bind_group_layouts: &[
+                    &layouts.globals.layout,
+                    &layouts.model.layout,
+                ],
                 push_constant_ranges: &[],
             });
 

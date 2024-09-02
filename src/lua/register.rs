@@ -14,7 +14,11 @@ use mlua::{
 use crate::{
     register_fields, register_getters, register_methods_mut,
     register_to_string,
-    render::{bundle::model, camera::Camera, state::RenderState},
+    render::{
+        bundle::model::{self},
+        camera::Camera,
+        state::RenderState,
+    },
     scene::Scene,
     transform::Transform,
 };
@@ -114,6 +118,7 @@ fn register_scene_methods_mut<T: std::borrow::BorrowMut<Scene> + fmt::Debug>(
         |_, this, (mesh_id, transform): (String, UserDataRef<Transform>)| {
             this.borrow_mut().model_batches.add_model(
                 mesh_id,
+                model::DEFAULT_DIFFUSE_TEXTURE.to_string(),
                 model::Instance::new(transform.build_matrix(), transform.rot),
             );
             Ok(())
