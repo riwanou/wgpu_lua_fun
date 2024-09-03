@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use glam::Vec3;
+use glam::{Quat, Vec3};
 use log::info;
 use mlua::{
     AnyUserData, Error, Function, Lua, MetaMethod, Result, Scope, Table,
@@ -80,12 +80,21 @@ fn register_vec3(lua: &Lua) -> Result<()> {
     lua.globals().set("Vec3", table)
 }
 
+fn register_quat(lua: &Lua) -> Result<()> {
+    let table = lua.create_table()?;
+    table.set(
+        "default",
+        lua.create_function(|_, _: ()| Ok(AnyUserData::wrap(Quat::default())))?,
+    )?;
+    lua.globals().set("Quat", table)
+}
+
 fn register_transform_methods_mut<
     T: std::borrow::BorrowMut<Transform> + fmt::Debug,
 >(
     reg: &mut UserDataRegistry<T>,
 ) {
-    register_fields!(reg, T, {}, userdata: { pos: Vec3, scale: Vec3 });
+    register_fields!(reg, T, {}, userdata: { pos: Vec3, rot: Quat, scale: Vec3 });
     register_to_string!(reg);
     reg.add_method("forward", |_, this, _: ()| {
         Ok(AnyUserData::wrap(this.borrow().forward()))
@@ -265,6 +274,7 @@ pub fn create_scoped_context<'scope>(
 
 pub fn register_types_globals(lua: &Lua) -> Result<()> {
     register_vec3(lua)?;
+    register_quat(lua)?;
     register_transform(lua)?;
     register_camera(lua)?;
     register_scene(lua)?;

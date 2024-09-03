@@ -16,8 +16,16 @@ declare Vec3: {
   splat: (val: number) -> Vec3,
 }
 
+declare class Quat
+end
+
+declare Quat: {
+  default: () -> Quat
+}
+
 declare class Transform
   pos: Vec3
+  rot: Quat
   scale: Vec3
   function forward(self): Vec3
   function right(self): Vec3

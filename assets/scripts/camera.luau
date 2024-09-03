@@ -7,9 +7,13 @@ type Camera = {
 local camera: Camera = cached_table("camera")
 
 function camera.init(self, ctx)
+	local window = ctx.window
 	local camera = ctx.scene.camera
-	self.enabled = false
+
+	self.enabled = true
+	window:grab_cursor()
 	camera.transform.pos = Vec3.new(0.5, 0, 10)
+	camera.transform.rot = Quat.default()
 end
 
 function camera.update(self, ctx, dt)
