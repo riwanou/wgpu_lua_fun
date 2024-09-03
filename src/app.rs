@@ -57,10 +57,6 @@ impl App {
         }
     }
 
-    fn window(&self) -> Arc<Window> {
-        self.window.clone().expect("Window not created")
-    }
-
     pub fn init(&mut self) -> Result<()> {
         self.inputs.register_action("forward", vec![KeyCode::KeyW]);
         self.inputs.register_action("backward", vec![KeyCode::KeyS]);
@@ -69,12 +65,15 @@ impl App {
         self.inputs.register_action("up", vec![KeyCode::Space]);
         self.inputs
             .register_action("down", vec![KeyCode::ShiftLeft]);
+        self.inputs.register_action("focus", vec![KeyCode::KeyF]);
 
-        self.render_state =
-            Some(pollster::block_on(RenderState::new(self.window())));
+        self.render_state = Some(pollster::block_on(RenderState::new(
+            self.window.clone().unwrap(),
+        )));
         self.lua.init(
             &mut self.scene,
             &self.inputs,
+            self.window.clone().unwrap(),
             self.render_state.as_mut().unwrap(),
         )?;
 
@@ -96,12 +95,18 @@ impl App {
             self.proxy.send_event(UserEvent::ExitApp)?;
         }
         if self.inputs.key_just_pressed(KeyCode::KeyR) {
-            self.lua.init(&mut self.scene, &self.inputs, render_state)?;
+            self.lua.init(
+                &mut self.scene,
+                &self.inputs,
+                self.window.clone().unwrap(),
+                render_state,
+            )?;
         }
 
         self.lua.update(
             &mut self.scene,
             &self.inputs,
+            self.window.clone().unwrap(),
             render_state,
             delta_sec,
             elapsed_sec,
@@ -143,6 +148,15 @@ impl ApplicationHandler<UserEvent> for App {
         }
     }
 
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        self.inputs.on_device_event(event)
+    }
+
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -158,7 +172,7 @@ impl ApplicationHandler<UserEvent> for App {
             }
             WindowEvent::RedrawRequested => {
                 self.update().unwrap();
-                self.window().request_redraw();
+                self.window.clone().unwrap().request_redraw();
             }
             WindowEvent::Focused(is_focused) => {
                 if !is_focused {
@@ -167,10 +181,10 @@ impl ApplicationHandler<UserEvent> for App {
             }
             _ => (),
         }
-        self.inputs.on_event(event);
+        self.inputs.on_window_event(event);
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        self.window().request_redraw();
+        self.window.clone().unwrap().request_redraw();
     }
 }

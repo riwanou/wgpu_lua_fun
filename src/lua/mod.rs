@@ -1,10 +1,11 @@
-use std::{ops::Deref, time::Instant};
+use std::{ops::Deref, sync::Arc, time::Instant};
 
 use anyhow::Result;
 use assets_manager::{loader, Asset, AssetCache};
 use log::error;
 use mlua::{Compiler, Function, Lua};
 use register::{create_scoped_context, register_types_globals};
+use winit::window::Window;
 
 use crate::{
     app::RELOAD_DEBOUNCE, input::Inputs, render::state::RenderState,
@@ -65,6 +66,7 @@ impl LuaState {
         &mut self,
         scene: &mut Scene,
         inputs: &Inputs,
+        window: Arc<Window>,
         render_state: &mut RenderState,
     ) -> Result<()> {
         let result = self.lua.scope(|scope| {
@@ -74,6 +76,7 @@ impl LuaState {
                 scope,
                 scene,
                 inputs,
+                window,
                 render_state,
             )?;
             init_fn.call::<_, ()>(ctx)?;
@@ -109,6 +112,7 @@ impl LuaState {
         &mut self,
         scene: &mut Scene,
         inputs: &Inputs,
+        window: Arc<Window>,
         render_state: &mut RenderState,
         delta_sec: f32,
         elapsed_sec: f32,
@@ -137,6 +141,7 @@ impl LuaState {
                 scope,
                 scene,
                 inputs,
+                window,
                 render_state,
             )?;
             update_fn.call::<_, ()>((ctx, delta_sec, elapsed_sec))?;

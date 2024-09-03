@@ -1,4 +1,5 @@
 local player = require("assets/scripts/player")
+local camera = require("assets/scripts/camera")
 
 function init(ctx: Context)
 	print("init")
@@ -11,36 +12,12 @@ function init(ctx: Context)
 		ctx.graphics:load_texture(texture_id)
 	end
 
+	camera:init(ctx)
 	player:init()
-	ctx.scene.camera.transform.pos = Vec3.new(0.5, 0, 10)
-end
-
-function update_camera(camera: Camera, inputs: Inputs, dt: number)
-	local direction = Vec3.splat(0)
-	if inputs:pressed("forward") then
-		direction.z -= 1
-	end
-	if inputs:pressed("backward") then
-		direction.z += 1
-	end
-	if inputs:pressed("left") then
-		direction.x -= 1
-	end
-	if inputs:pressed("right") then
-		direction.x += 1
-	end
-	if inputs:pressed("down") then
-		direction.y -= 1
-	end
-	if inputs:pressed("up") then
-		direction.y += 1
-	end
-
-	camera.transform.pos += direction * 15 * dt
 end
 
 function update(ctx: Context, dt: number, elapsed: number)
-	update_camera(ctx.scene.camera, ctx.inputs, dt)
+	camera:update(ctx, dt)
 
 	player:update(dt, elapsed)
 	player:render(ctx)

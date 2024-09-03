@@ -1,6 +1,7 @@
 use std::{
     fmt,
     ops::{Add, Div, Mul, Sub},
+    sync::Arc,
 };
 
 use glam::Vec3;
@@ -10,6 +11,7 @@ use mlua::{
     UserDataFields, UserDataMethods, UserDataRef, UserDataRegistry, Value,
     Variadic,
 };
+use winit::window::{CursorGrabMode, Window};
 
 use crate::{
     input::Inputs,
@@ -85,10 +87,23 @@ fn register_transform_methods_mut<
 ) {
     register_fields!(reg, T, {}, userdata: { pos: Vec3, scale: Vec3 });
     register_to_string!(reg);
+    reg.add_method("forward", |_, this, _: ()| {
+        Ok(AnyUserData::wrap(this.borrow().forward()))
+    });
+    reg.add_method("right", |_, this, _: ()| {
+        Ok(AnyUserData::wrap(this.borrow().right()))
+    });
     reg.add_method_mut(
         "rotate",
         |_, this, (axis, angle): (UserDataRef<Vec3>, f32)| {
             this.borrow_mut().rotate(*axis, angle);
+            Ok(())
+        },
+    );
+    reg.add_method_mut(
+        "rotate_local",
+        |_, this, (axis, angle): (UserDataRef<Vec3>, f32)| {
+            this.borrow_mut().rotate_local(*axis, angle);
             Ok(())
         },
     );
@@ -150,11 +165,55 @@ fn register_scene(lua: &Lua) -> Result<()> {
 
 fn register_inputs(lua: &Lua) -> Result<()> {
     lua.register_userdata_type::<Inputs>(|reg| {
+        reg.add_method("cursor_in_window", |_, this, _: ()| {
+            Ok(this.cursor_in_window)
+        });
+        reg.add_method("focused", |_, this, _: ()| Ok(this.focused));
         reg.add_method("pressed", |_, this, action: String| {
             Ok(this.action_pressed(&action))
         });
         reg.add_method("just_pressed", |_, this, action: String| {
             Ok(this.action_just_pressed(&action))
+        });
+        reg.add_method("mouse_pressed", |_, this, button: String| {
+            let state = match button.as_bytes() {
+                b"left" => this.mouse_pressed(0),
+                b"right" => this.mouse_pressed(1),
+                _ => return Err(Error::runtime("Invalid mouse button")),
+            };
+            Ok(state)
+        });
+        reg.add_method("mouse_just_pressed", |_, this, button: String| {
+            let state = match button.as_bytes() {
+                b"left" => this.mouse_just_pressed(0),
+                b"right" => this.mouse_just_pressed(1),
+                _ => return Err(Error::runtime("Invalid mouse button")),
+            };
+            Ok(state)
+        });
+        reg.add_method("mouse_delta", |lua, this, _: ()| {
+            let delta = this.mouse_delta;
+            let table = lua.create_table_from(
+                vec![("x", delta.x), ("y", delta.y)].into_iter(),
+            )?;
+            Ok(table)
+        });
+    })
+}
+
+fn register_window(lua: &Lua) -> Result<()> {
+    lua.register_userdata_type::<Arc<Window>>(|reg| {
+        reg.add_method("grab_cursor", |_, this, _: ()| {
+            this.set_cursor_grab(CursorGrabMode::Locked)
+                .map_err(Error::runtime)?;
+            this.set_cursor_visible(false);
+            Ok(())
+        });
+        reg.add_method("release_cursor", |_, this, _: ()| {
+            this.set_cursor_grab(CursorGrabMode::None)
+                .map_err(Error::runtime)?;
+            this.set_cursor_visible(true);
+            Ok(())
         });
     })
 }
@@ -193,11 +252,13 @@ pub fn create_scoped_context<'scope>(
     scope: &Scope<'_, 'scope>,
     scene: &'scope mut Scene,
     inputs: &'scope Inputs,
+    window: Arc<Window>,
     render_state: &'scope mut RenderState,
 ) -> Result<Table<'scope>> {
     let ctx = lua.create_table()?;
     ctx.set("scene", scope.create_any_userdata_ref_mut(scene)?)?;
     ctx.set("inputs", scope.create_any_userdata_ref(inputs)?)?;
+    ctx.set("window", scope.create_any_userdata(window)?)?;
     ctx.set("graphics", scope.create_any_userdata_ref_mut(render_state)?)?;
     Ok(ctx)
 }
@@ -208,6 +269,7 @@ pub fn register_types_globals(lua: &Lua) -> Result<()> {
     register_camera(lua)?;
     register_scene(lua)?;
     register_inputs(lua)?;
+    register_window(lua)?;
     register_render_state(lua)?;
     register_cached_tables(lua)?;
 

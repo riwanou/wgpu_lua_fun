@@ -5,7 +5,6 @@ pub struct Transform {
     pub pos: Vec3,
     pub rot: Quat,
     pub scale: Vec3,
-    pub up: Vec3,
 }
 
 impl Default for Transform {
@@ -14,7 +13,6 @@ impl Default for Transform {
             pos: Vec3::ZERO,
             rot: Quat::IDENTITY,
             scale: Vec3::splat(1.0),
-            up: Vec3::Y,
         }
     }
 }
@@ -32,19 +30,19 @@ impl Transform {
     }
 
     pub fn rotate(&mut self, axis: Vec3, angle: f32) {
+        self.rot = Quat::from_axis_angle(axis, angle) * self.rot;
+    }
+
+    pub fn rotate_local(&mut self, axis: Vec3, angle: f32) {
         self.rot *= Quat::from_axis_angle(axis, angle);
     }
 
-    pub fn rotate_x(&mut self, angle: f32) {
-        self.rotate(Vec3::X, angle);
+    pub fn right(&self) -> Vec3 {
+        (self.rot * Vec3::X).normalize()
     }
 
-    pub fn rotate_y(&mut self, angle: f32) {
-        self.rotate(Vec3::Y, angle);
-    }
-
-    pub fn rotate_z(&mut self, angle: f32) {
-        self.rotate(Vec3::Z, angle);
+    pub fn forward(&self) -> Vec3 {
+        (self.rot * -Vec3::Z).normalize()
     }
 
     pub fn look_at(&mut self, target: Vec3) {
@@ -53,7 +51,7 @@ impl Transform {
     }
 
     pub fn look_to(&mut self, forward: Vec3) {
-        let right = self.up.cross(forward).normalize();
+        let right = Vec3::Y.cross(forward).normalize();
         let local_up = forward.cross(right);
         self.rot = Quat::from_mat3(&Mat3::from_cols(right, local_up, forward));
     }

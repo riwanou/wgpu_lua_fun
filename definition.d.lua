@@ -19,7 +19,10 @@ declare Vec3: {
 declare class Transform
   pos: Vec3
   scale: Vec3
+  function forward(self): Vec3
+  function right(self): Vec3
   function rotate(self, axis: Vec3, angle: number): ()
+  function rotate_local(self, axis: Vec3, angle: number): ()
 end
 
 declare Transform: {
@@ -36,11 +39,21 @@ declare class Scene
   function batch_model(self, mesh_id: string, texture_id: string?, transform: Transform): ()
 end
 
-type Action = "forward" | "backward" | "right" | "left" | "up" | "down"
+type Action = "forward" | "backward" | "right" | "left" | "up" | "down" | "focus"
 
 declare class Inputs
+  function cursor_in_window(self): boolean
+  function focused(self): boolean
   function pressed(self, action: Action): boolean
   function just_pressed(self, action: Action): boolean
+  function mouse_pressed(self, button: "left" | "right"): boolean
+  function mouse_just_pressed(self, button: "left" | "right"): boolean
+  function mouse_delta(self): { x: number, y: number }
+end
+
+declare class Window 
+  function grab_cursor(self): ()
+  function release_cursor(self): ()
 end
 
 declare class Graphics
@@ -51,6 +64,7 @@ end
 export type Context = {
   scene: Scene,
   inputs: Inputs,
+  window: Window,
   graphics: Graphics,
 }
 
