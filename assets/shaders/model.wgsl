@@ -61,13 +61,34 @@ fn vs_main(model: VertexInput, instance: InstanceInput) -> VertexOutput {
     return out;
 }
 
+struct PointLight {
+    position: vec3<f32>,
+}
+
+struct PointLightData {
+    len: u32,
+    data: array<PointLight>,
+}
+
 @group(1) @binding(0)
+var<storage, read> point_lights: PointLightData;
+
+@group(2) @binding(0)
 var t_diffuse: texture_2d<f32>;
-@group(1) @binding(1)
+@group(2) @binding(1)
 var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let diffuse_sample = textureSample(t_diffuse, s_diffuse, in.tex_coords);
-    return vec4<f32>(diffuse_sample.xyz, 1.0);
+    var color = vec3<f32>(0.0);
+
+    for (var i: u32 = 0; i < point_lights.len; i++) {
+        let point_light = point_lights.data[i];
+        let distance = length(point_light.position - in.world_position);
+        let attenuation = 1.0 / (1.0 + 0.7 * distance + 1.8 * (distance * distance));
+        color += diffuse_sample.xyz * attenuation;
+    }
+
+    return vec4<f32>(color, 1.0);
 }

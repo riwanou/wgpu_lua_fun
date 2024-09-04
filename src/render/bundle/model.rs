@@ -177,7 +177,7 @@ impl Batches {
             ) else {
                 continue;
             };
-            rpass.set_bind_group(1, bind_group, &[]);
+            rpass.set_bind_group(2, bind_group, &[]);
             rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 mesh.index_buffer.slice(..),
@@ -272,6 +272,7 @@ impl Pipeline {
                 label: Some("model_layout"),
                 bind_group_layouts: &[
                     &layouts.globals.layout,
+                    &layouts.lights.layout,
                     &layouts.model.layout,
                 ],
                 push_constant_ranges: &[],

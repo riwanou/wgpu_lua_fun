@@ -1,10 +1,12 @@
 use super::{shader::ShaderAssets, texture::TextureAssets};
 
 pub mod globals;
+pub mod lights;
 pub mod model;
 
 pub struct Layouts {
     globals: globals::Layout,
+    lights: lights::Layout,
     model: model::Layout,
 }
 
@@ -12,6 +14,7 @@ impl Layouts {
     pub fn new(device: &wgpu::Device) -> Self {
         Self {
             globals: globals::Layout::new(device),
+            lights: lights::Layout::new(device),
             model: model::Layout::new(device),
         }
     }
@@ -19,6 +22,7 @@ impl Layouts {
 
 pub struct Bundles {
     pub globals: globals::Bundle,
+    pub lights: lights::Bundle,
     pub model: model::Bundle,
 }
 
@@ -32,6 +36,7 @@ impl Bundles {
     ) -> Self {
         Self {
             globals: globals::Bundle::new(device, layouts),
+            lights: lights::Bundle::new(device, layouts),
             model: model::Bundle::new(
                 device, config, layouts, shaders, textures,
             ),

@@ -118,7 +118,16 @@ impl RenderState {
             elapsed,
             &scene.camera,
         );
-        scene.prepare(&self.device, &self.layouts, &self.textures);
+        self.bundles.lights.prepare(
+            &self.device,
+            &self.layouts,
+            &scene.point_lights,
+        );
+        scene.model_batches.prepare(
+            &self.device,
+            &self.layouts,
+            &self.textures,
+        );
 
         {
             let mut rpass =
@@ -153,6 +162,7 @@ impl RenderState {
 
             rpass.set_pipeline(&self.bundles.model.pipeline.pipeline);
             rpass.set_bind_group(0, &self.bundles.globals.bind_group, &[]);
+            rpass.set_bind_group(1, &self.bundles.lights.bind_group, &[]);
             scene.model_batches.render(&mut rpass, &self.meshes);
         }
 

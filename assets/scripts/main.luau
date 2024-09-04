@@ -22,6 +22,15 @@ function update(ctx: Context, dt: number, elapsed: number)
 	player:update(dt, elapsed)
 	player:render(ctx)
 
+	-- on the objects
+	ctx.scene:point_light(Vec3.new(-2, 2, -10))
+	ctx.scene:point_light(Vec3.new(-2, 2, -2))
+
+	-- on the ground
+	ctx.scene:point_light(Vec3.new(2, -5, 8))
+	ctx.scene:point_light(Vec3.new(-5, -5, 5))
+	ctx.scene:point_light(Vec3.new(8, -5, -3))
+
 	local plane = Transform.new(Vec3.new(0, -4.5, 0))
 	local size = 25
 	plane.scale = Vec3.new(size, 0, size)

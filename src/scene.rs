@@ -2,16 +2,16 @@ use std::fmt;
 
 use crate::render::{
     bundle::{
+        lights,
         model::{self, Batches},
-        Layouts,
     },
     camera::Camera,
-    texture::TextureAssets,
 };
 
 pub struct Scene {
     pub camera: Camera,
     pub model_batches: model::Batches,
+    pub point_lights: Vec<lights::PointLight>,
 }
 
 impl fmt::Debug for Scene {
@@ -25,19 +25,12 @@ impl Scene {
         Self {
             camera: Camera::new(),
             model_batches: Batches::default(),
+            point_lights: Vec::new(),
         }
     }
 
     pub fn begin_frame(&mut self) {
         self.model_batches.clear();
-    }
-
-    pub fn prepare(
-        &mut self,
-        device: &wgpu::Device,
-        layouts: &Layouts,
-        textures: &TextureAssets,
-    ) {
-        self.model_batches.prepare(device, layouts, textures);
+        self.point_lights.clear();
     }
 }

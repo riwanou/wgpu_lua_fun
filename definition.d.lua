@@ -45,6 +45,7 @@ end
 declare class Scene
   camera: Camera
   function batch_model(self, mesh_id: string, texture_id: string?, transform: Transform): ()
+  function point_light(self, pos: Vec3): ()
 end
 
 type Action = "forward" | "backward" | "right" | "left" | "up" | "down" | "focus"

@@ -17,7 +17,11 @@ use crate::{
     input::Inputs,
     register_fields, register_getters, register_methods_mut,
     register_to_string,
-    render::{bundle::model, camera::Camera, state::RenderState},
+    render::{
+        bundle::{lights, model},
+        camera::Camera,
+        state::RenderState,
+    },
     scene::Scene,
     transform::Transform,
 };
@@ -165,6 +169,12 @@ fn register_scene_methods_mut<T: std::borrow::BorrowMut<Scene> + fmt::Debug>(
             Ok(())
         },
     );
+    reg.add_method_mut("point_light", |_, this, pos: UserDataRef<Vec3>| {
+        this.borrow_mut()
+            .point_lights
+            .push(lights::PointLight { pos: *pos });
+        Ok(())
+    });
 }
 
 fn register_scene(lua: &Lua) -> Result<()> {
