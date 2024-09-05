@@ -63,6 +63,7 @@ fn vs_main(model: VertexInput, instance: InstanceInput) -> VertexOutput {
 
 struct PointLight {
     position: vec3<f32>,
+    radius: f32,
 }
 
 struct PointLightData {
@@ -78,15 +79,25 @@ var t_diffuse: texture_2d<f32>;
 @group(2) @binding(1)
 var s_diffuse: sampler;
 
+// Radius based attenuation
+// https://lisyarus.github.io/blog/posts/point-light-attenuation.html
+fn attenuate(distance: f32, radius: f32) -> f32 {
+    let s = saturate(distance / radius);
+    let s2 = s * s;
+    let inv_s2 = 1.0 - s2;
+    return inv_s2 * inv_s2 / (1.0 + s);
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let diffuse_sample = textureSample(t_diffuse, s_diffuse, in.tex_coords);
-    var color = vec3<f32>(0.0);
+    let ambient = diffuse_sample.xyz * vec3<f32>(0.03);
+    var color = ambient;
 
     for (var i: u32 = 0; i < point_lights.len; i++) {
         let point_light = point_lights.data[i];
         let distance = length(point_light.position - in.world_position);
-        let attenuation = 1.0 / (1.0 + 0.7 * distance + 1.8 * (distance * distance));
+        let attenuation = attenuate(distance, point_light.radius);
         color += diffuse_sample.xyz * attenuation;
     }
 

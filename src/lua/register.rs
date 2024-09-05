@@ -169,12 +169,15 @@ fn register_scene_methods_mut<T: std::borrow::BorrowMut<Scene> + fmt::Debug>(
             Ok(())
         },
     );
-    reg.add_method_mut("point_light", |_, this, pos: UserDataRef<Vec3>| {
-        this.borrow_mut()
-            .point_lights
-            .push(lights::PointLight { pos: *pos });
-        Ok(())
-    });
+    reg.add_method_mut(
+        "point_light",
+        |_, this, (pos, radius): (UserDataRef<Vec3>, f32)| {
+            this.borrow_mut()
+                .point_lights
+                .push(lights::PointLight { pos: *pos, radius });
+            Ok(())
+        },
+    );
 }
 
 fn register_scene(lua: &Lua) -> Result<()> {

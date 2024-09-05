@@ -54,6 +54,7 @@ impl Bundle {
 #[derive(Debug, Default, ShaderType, Clone)]
 pub struct PointLight {
     pub pos: Vec3,
+    pub radius: f32,
 }
 
 #[derive(Default, ShaderType)]
