@@ -54,7 +54,7 @@ impl Bundle {
         };
 
         if self.registered_shaders.contains(shader_id) {
-            info!("Reloading pipeline for registered shader {}", shader_id);
+            info!("Pipeline loaded with shader: {}", shader_id);
             let module = shaders.get(shader_id).unwrap();
             self.pipelines.insert(
                 shader_id.clone(),
@@ -63,8 +63,8 @@ impl Bundle {
         }
     }
 
-    pub fn register_shader(&mut self, shader: &String) {
-        self.registered_shaders.insert(shader.clone());
+    pub fn register_shader(&mut self, shader_id: &str) {
+        self.registered_shaders.insert(shader_id.to_string());
     }
 }
 
