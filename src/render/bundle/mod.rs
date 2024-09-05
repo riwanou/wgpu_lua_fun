@@ -29,7 +29,6 @@ pub struct Bundles {
 impl Bundles {
     pub fn new(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
         layouts: &Layouts,
         shaders: &mut ShaderAssets,
         textures: &mut TextureAssets,
@@ -37,9 +36,7 @@ impl Bundles {
         Self {
             globals: globals::Bundle::new(device, layouts),
             lights: lights::Bundle::new(device, layouts),
-            model: model::Bundle::new(
-                device, config, layouts, shaders, textures,
-            ),
+            model: model::Bundle::new(shaders, textures),
         }
     }
 

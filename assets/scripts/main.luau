@@ -12,6 +12,8 @@ function init(ctx: Context)
 		ctx.graphics:load_texture(texture_id)
 	end
 
+	ctx.graphics:load_shader("animated")
+
 	camera:init(ctx)
 	player:init()
 end
@@ -34,10 +36,16 @@ function update(ctx: Context, dt: number, elapsed: number)
 	local plane = Transform.new(Vec3.new(0, -4.5, 0))
 	local size = 25
 	plane.scale = Vec3.new(size, 0, size)
-	ctx.scene:batch_model("plane", "weave", plane)
+	ctx.scene:batch_model("plane", "weave", nil, plane)
 
-	ctx.scene:batch_model("cube", "256-palette", Transform.new(Vec3.new(2, 2, -10)))
-	ctx.scene:batch_model("cube", "blue_nebula", Transform.new(Vec3.new(-2, 2, -2)))
-	ctx.scene:batch_model("cube", "dragon", Transform.new(Vec3.new(2, -2, 1)))
-	ctx.scene:batch_model("cube", nil, Transform.new(Vec3.new(-3, -2, 3)))
+	-- big cube
+	local big_cube = Transform.new(Vec3.new(13, 2, -2))
+	big_cube.scale = Vec3.splat(3.5)
+	ctx.scene:batch_model("cube", nil, nil, big_cube)
+
+	-- small cubes
+	ctx.scene:batch_model("cube", "blue_nebula", "animated", Transform.new(Vec3.new(2, 2, -10)))
+	ctx.scene:batch_model("cube", "blue_nebula", "animated", Transform.new(Vec3.new(-2, 2, -2)))
+	ctx.scene:batch_model("cube", "dragon", nil, Transform.new(Vec3.new(2, -2, 1)))
+	ctx.scene:batch_model("cube", nil, nil, Transform.new(Vec3.new(-3, -2, 3)))
 end

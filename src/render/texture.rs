@@ -112,12 +112,12 @@ impl Texture {
     }
 }
 
-pub struct Image(Arc<DynamicImage>);
+pub struct Image(DynamicImage);
 
 pub struct ImageLoader;
 impl Loader<Image> for ImageLoader {
     fn load(content: Cow<[u8]>, _ext: &str) -> Result<Image, BoxedError> {
-        Ok(Image(Arc::new(image::load_from_memory(&content)?)))
+        Ok(Image(image::load_from_memory(&content)?))
     }
 }
 
@@ -126,7 +126,7 @@ impl Asset for Image {
     type Loader = ImageLoader;
 }
 
-type LoadResult = Result<(String, Arc<DynamicImage>)>;
+type LoadResult = Result<(String, Box<DynamicImage>)>;
 
 pub struct TextureAssets {
     cache: Arc<AssetCache>,
@@ -191,7 +191,7 @@ impl TextureAssets {
             let result = (|| {
                 let handle = cache.load::<Image>(&texture_id)?;
                 let data = handle.read().0.clone();
-                Ok((texture_id, data))
+                Ok((texture_id, Box::new(data)))
             })();
             load_tx.send(result).unwrap();
         });

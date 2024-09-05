@@ -14,14 +14,14 @@ use super::{
 pub struct RenderState {
     _adapter: wgpu::Adapter,
     _instance: wgpu::Instance,
-    bundles: Bundles,
+    pub bundles: Bundles,
     config: wgpu::SurfaceConfiguration,
     pub depth: Texture,
     pub device: wgpu::Device,
     layouts: Layouts,
     pub meshes: MeshAssets,
     queue: wgpu::Queue,
-    shaders: ShaderAssets,
+    pub shaders: ShaderAssets,
     surface: wgpu::Surface<'static>,
     pub textures: TextureAssets,
 }
@@ -56,13 +56,8 @@ impl RenderState {
         let mut textures = TextureAssets::new();
         let meshes = MeshAssets::new();
         let layouts = Layouts::new(&device);
-        let bundles = Bundles::new(
-            &device,
-            &config,
-            &layouts,
-            &mut shaders,
-            &mut textures,
-        );
+        let bundles =
+            Bundles::new(&device, &layouts, &mut shaders, &mut textures);
         let depth = Texture::create_depth(&device, &config);
 
         Self {
@@ -82,7 +77,7 @@ impl RenderState {
     }
 
     pub fn hot_reload(&mut self) {
-        self.shaders.hot_reload();
+        self.shaders.hot_reload(&self.device);
         self.meshes.hot_reload(&self.device);
         self.textures.hot_reload(&self.device, &self.queue);
         self.bundles.hot_reload(
@@ -160,10 +155,13 @@ impl RenderState {
                     ..Default::default()
                 });
 
-            rpass.set_pipeline(&self.bundles.model.pipeline.pipeline);
             rpass.set_bind_group(0, &self.bundles.globals.bind_group, &[]);
             rpass.set_bind_group(1, &self.bundles.lights.bind_group, &[]);
-            scene.model_batches.render(&mut rpass, &self.meshes);
+            scene.model_batches.render(
+                &mut rpass,
+                &self.bundles.model,
+                &self.meshes,
+            );
         }
 
         self.queue.submit(Some(encoder.finish()));

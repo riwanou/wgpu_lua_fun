@@ -70,7 +70,7 @@ impl Asset for ObjSource {
     type Loader = loader::LoadFrom<String, loader::StringLoader>;
 }
 
-type LoadResult = Result<(String, Arc<Vec<model::Vertex>>, Arc<Vec<u32>>)>;
+type LoadResult = Result<(String, Box<Vec<model::Vertex>>, Box<Vec<u32>>)>;
 
 pub struct MeshAssets {
     cache: Arc<AssetCache>,
@@ -167,7 +167,7 @@ impl MeshAssets {
                     indices.append(&mut m.mesh.indices);
                 }
 
-                Ok((mesh_id, Arc::new(vertices), Arc::new(indices)))
+                Ok((mesh_id, Box::new(vertices), Box::new(indices)))
             })();
             load_tx.send(result).unwrap();
         });

@@ -155,8 +155,9 @@ fn register_scene_methods_mut<T: std::borrow::BorrowMut<Scene> + fmt::Debug>(
         "batch_model",
         |_,
          this,
-         (mesh_id, texture_id, transform): (
+         (mesh_id, texture_id, shader_id, transform): (
             String,
+            Option<String>,
             Option<String>,
             UserDataRef<Transform>,
         )| {
@@ -164,6 +165,7 @@ fn register_scene_methods_mut<T: std::borrow::BorrowMut<Scene> + fmt::Debug>(
                 mesh_id,
                 texture_id
                     .unwrap_or(model::DEFAULT_DIFFUSE_TEXTURE.to_string()),
+                shader_id.unwrap_or(model::DEFAULT_SHADER.to_string()),
                 model::Instance::new(transform.build_matrix(), transform.rot),
             );
             Ok(())
@@ -248,6 +250,11 @@ fn register_render_state(lua: &Lua) -> Result<()> {
         });
         reg.add_method_mut("load_texture", |_, this, texture_id: String| {
             this.textures.load(&texture_id);
+            Ok(())
+        });
+        reg.add_method_mut("load_shader", |_, this, shader_id: String| {
+            this.shaders.load(&shader_id);
+            this.bundles.model.register_shader(&shader_id);
             Ok(())
         });
     })

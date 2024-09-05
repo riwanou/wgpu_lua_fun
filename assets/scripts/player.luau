@@ -19,7 +19,7 @@ function player.update(self, dt, elapsed)
 end
 
 function player.render(self, ctx)
-	ctx.scene:batch_model("dragon", "blue_nebula", self.transform)
+	ctx.scene:batch_model("dragon", "blue_nebula", nil, self.transform)
 end
 
 return player

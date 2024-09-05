@@ -1,6 +1,10 @@
-use std::{collections::HashMap, mem};
+use std::{
+    collections::{HashMap, HashSet},
+    mem,
+};
 
 use bytemuck::{cast_slice, Pod, Zeroable};
+use encase::ShaderType;
 use glam::{Mat3, Mat4, Quat};
 use log::info;
 use wgpu::util::DeviceExt;
@@ -14,22 +18,27 @@ use crate::render::{
 use super::Layouts;
 
 pub const DEFAULT_DIFFUSE_TEXTURE: &str = "white";
+pub const DEFAULT_SHADER: &str = "model";
 
 pub struct Bundle {
-    pub pipeline: Pipeline,
+    pub pipelines: HashMap<String, Pipeline>,
+    registered_shaders: HashSet<String>,
 }
 
 impl Bundle {
     pub fn new(
-        device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-        layouts: &Layouts,
         shaders: &mut ShaderAssets,
         textures: &mut TextureAssets,
     ) -> Self {
         textures.load(DEFAULT_DIFFUSE_TEXTURE);
+
+        let mut registered_shaders = HashSet::new();
+        registered_shaders.insert(DEFAULT_SHADER.to_string());
+        shaders.load(DEFAULT_SHADER);
+
         Self {
-            pipeline: Pipeline::new(device, config, layouts, shaders),
+            pipelines: HashMap::new(),
+            registered_shaders,
         }
     }
 
@@ -40,13 +49,22 @@ impl Bundle {
         layouts: &Layouts,
         shaders: &mut ShaderAssets,
     ) {
-        if shaders.reloaded(&self.pipeline.shader_id) {
-            info!(
-                "Reloading model pipeline from {}.wgsl",
-                self.pipeline.shader_id
+        let Some(shader_id) = &shaders.frame_reloaded else {
+            return;
+        };
+
+        if self.registered_shaders.contains(shader_id) {
+            info!("Reloading pipeline for registered shader {}", shader_id);
+            let module = shaders.get(shader_id).unwrap();
+            self.pipelines.insert(
+                shader_id.clone(),
+                Pipeline::new(device, config, layouts, module),
             );
-            self.pipeline = Pipeline::new(device, config, layouts, shaders);
         }
+    }
+
+    pub fn register_shader(&mut self, shader: &String) {
+        self.registered_shaders.insert(shader.clone());
     }
 }
 
@@ -116,6 +134,7 @@ struct InstanceArray {
 struct Key {
     mesh_id: String,
     texture_id: String,
+    shader_id: String,
 }
 
 #[derive(Default)]
@@ -129,11 +148,13 @@ impl Batches {
         &mut self,
         mesh_id: String,
         texture_id: String,
+        shader_id: String,
         instance: Instance,
     ) {
         let key = Key {
             mesh_id,
             texture_id,
+            shader_id,
         };
         self.instances.entry(key).or_default().data.push(instance);
     }
@@ -152,7 +173,16 @@ impl Batches {
             if let Some(texture) = textures.get(&key.texture_id) {
                 self.bind_groups
                     .entry(key.texture_id.clone())
-                    .or_insert_with(|| layouts.model.bind(device, texture));
+                    .or_insert_with(|| {
+                        let buffer = device.create_buffer_init(
+                            &wgpu::util::BufferInitDescriptor {
+                                label: Some("model_uniform"),
+                                contents: &Uniform::default().as_bytes(),
+                                usage: wgpu::BufferUsages::UNIFORM,
+                            },
+                        );
+                        layouts.model.bind(device, &buffer, texture)
+                    });
             }
 
             instances.buffer = Some(device.create_buffer_init(
@@ -165,18 +195,33 @@ impl Batches {
         }
     }
 
-    pub fn render(&self, rpass: &mut wgpu::RenderPass, meshes: &MeshAssets) {
+    pub fn render(
+        &self,
+        rpass: &mut wgpu::RenderPass,
+        bundle: &Bundle,
+        meshes: &MeshAssets,
+    ) {
         for (key, instances) in &self.instances {
             if instances.data.is_empty() {
                 continue;
             }
-            let (Some(mesh), Some(bind_group), Some(instances_buffer)) = (
+
+            let (
+                Some(mesh),
+                Some(bind_group),
+                Some(pipeline),
+                Some(instances_buffer),
+            ) = (
                 meshes.get(&key.mesh_id),
                 self.bind_groups.get(&key.texture_id),
+                bundle.pipelines.get(&key.shader_id),
                 &instances.buffer,
-            ) else {
+            )
+            else {
                 continue;
             };
+
+            rpass.set_pipeline(&pipeline.pipeline);
             rpass.set_bind_group(2, bind_group, &[]);
             rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             rpass.set_index_buffer(
@@ -197,6 +242,25 @@ impl Batches {
     }
 }
 
+#[derive(ShaderType)]
+pub struct Uniform {
+    bloup: f32,
+}
+
+impl Default for Uniform {
+    fn default() -> Self {
+        Self { bloup: 42.0 }
+    }
+}
+
+impl Uniform {
+    fn as_bytes(&self) -> Vec<u8> {
+        let mut buffer = encase::UniformBuffer::new(Vec::<u8>::new());
+        buffer.write(self).unwrap();
+        buffer.into_inner()
+    }
+}
+
 pub struct Layout {
     pub layout: wgpu::BindGroupLayout,
 }
@@ -209,6 +273,16 @@ impl Layout {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             sample_type: wgpu::TextureSampleType::default(),
@@ -218,7 +292,7 @@ impl Layout {
                         count: None,
                     },
                     wgpu::BindGroupLayoutEntry {
-                        binding: 1,
+                        binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(
                             wgpu::SamplerBindingType::Filtering,
@@ -233,6 +307,7 @@ impl Layout {
     pub fn bind(
         &self,
         device: &wgpu::Device,
+        uniform: &wgpu::Buffer,
         texture: &Texture,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -241,10 +316,16 @@ impl Layout {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture.view),
+                    resource: wgpu::BindingResource::Buffer(
+                        uniform.as_entire_buffer_binding(),
+                    ),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
                     resource: wgpu::BindingResource::Sampler(&texture.sampler),
                 },
             ],
@@ -254,7 +335,6 @@ impl Layout {
 
 pub struct Pipeline {
     pub pipeline: wgpu::RenderPipeline,
-    shader_id: String,
 }
 
 impl Pipeline {
@@ -262,11 +342,8 @@ impl Pipeline {
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         layouts: &Layouts,
-        shaders: &mut ShaderAssets,
+        module: &wgpu::ShaderModule,
     ) -> Self {
-        let shader_id = "model".to_string();
-        let module = shaders.load(&shader_id, device);
-
         let pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("model_layout"),
@@ -283,13 +360,13 @@ impl Pipeline {
                 label: Some("model_pipeline"),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &module,
+                    module,
                     entry_point: "vs_main",
                     buffers: &[Vertex::desc(), Instance::desc()],
                     compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &module,
+                    module,
                     entry_point: "fs_main",
                     compilation_options: Default::default(),
                     targets: &[Some(wgpu::ColorTargetState {
@@ -312,9 +389,6 @@ impl Pipeline {
                 cache: None,
             });
 
-        Self {
-            pipeline,
-            shader_id,
-        }
+        Self { pipeline }
     }
 }

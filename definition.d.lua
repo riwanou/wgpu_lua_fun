@@ -44,7 +44,7 @@ end
 
 declare class Scene
   camera: Camera
-  function batch_model(self, mesh_id: string, texture_id: string?, transform: Transform): ()
+  function batch_model(self, mesh_id: string, texture_id: string?, shader_id: string?, transform: Transform): ()
   function point_light(self, pos: Vec3, radius: number): ()
 end
 
@@ -68,6 +68,7 @@ end
 declare class Graphics
   function load_mesh(self, mesh_id: string): ()
   function load_texture(self, texture_id: string): ()
+  function load_shader(self, shader_id: string): ()
 end
 
 export type Context = {

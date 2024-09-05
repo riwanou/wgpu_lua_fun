@@ -96,16 +96,17 @@ fn attenuate(distance: f32, radius: f32) -> f32 {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let diffuse_sample = textureSample(t_diffuse, s_diffuse, in.tex_coords);
-    let ambient = diffuse_sample.xyz * vec3<f32>(0.03);
-    var color = ambient;
-
-    for (var i: u32 = 0; i < point_lights.len; i++) {
-        let point_light = point_lights.data[i];
-        let distance = length(point_light.position - in.world_position);
-        let attenuation = attenuate(distance, point_light.radius);
-        color += diffuse_sample.xyz * attenuation;
+    let val = map(cos(globals.elapsed), -1.0, 1.0, 0.0, 1.0);
+    var ease = 0.0;
+    if val < 0.5 {
+        ease = 4 * val * val * val;
+    } else {
+        let a = -2 * val + 2;
+        ease = a * a * a / 2;
     }
+
+    let diffuse_sample = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    let color = mix(diffuse_sample.xyz, vec3<f32>(val, 0.2, 0.3), ease);
 
     return vec4<f32>(color, 1.0);
 }
