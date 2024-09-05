@@ -48,7 +48,7 @@ declare class Scene
   function point_light(self, pos: Vec3, radius: number): ()
 end
 
-type Action = "forward" | "backward" | "right" | "left" | "up" | "down" | "focus"
+type Action = "forward" | "backward" | "right" | "left" | "up" | "down" | "focus"| "interact"
 
 declare class Inputs
   function cursor_in_window(self): boolean

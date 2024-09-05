@@ -66,6 +66,7 @@ impl App {
         self.inputs
             .register_action("down", vec![KeyCode::ShiftLeft]);
         self.inputs.register_action("focus", vec![KeyCode::KeyF]);
+        self.inputs.register_action("interact", vec![KeyCode::KeyE]);
 
         self.render_state = Some(pollster::block_on(RenderState::new(
             self.window.clone().unwrap(),

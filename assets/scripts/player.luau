@@ -19,7 +19,11 @@ function player.update(self, dt, elapsed)
 end
 
 function player.render(self, ctx)
-	ctx.scene:batch_model("dragon", "blue_nebula", nil, self.transform)
+	local shader = nil
+	if ctx.inputs:pressed("interact") then
+		shader = "animated"
+	end
+	ctx.scene:batch_model("dragon", "blue_nebula", shader, self.transform)
 end
 
 return player
