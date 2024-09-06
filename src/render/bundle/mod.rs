@@ -1,4 +1,6 @@
-use super::{shader::ShaderAssets, texture::TextureAssets};
+use super::{
+    material::MaterialManager, shader::ShaderAssets, texture::TextureAssets,
+};
 
 pub mod globals;
 pub mod lights;
@@ -32,11 +34,12 @@ impl Bundles {
         layouts: &Layouts,
         shaders: &mut ShaderAssets,
         textures: &mut TextureAssets,
+        materials: &mut MaterialManager,
     ) -> Self {
         Self {
             globals: globals::Bundle::new(device, layouts),
             lights: lights::Bundle::new(device, layouts),
-            model: model::Bundle::new(shaders, textures),
+            model: model::Bundle::new(shaders, textures, materials),
         }
     }
 

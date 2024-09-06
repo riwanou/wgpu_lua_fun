@@ -1,15 +1,15 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     mem,
 };
 
 use bytemuck::{cast_slice, Pod, Zeroable};
-use encase::ShaderType;
 use glam::{Mat3, Mat4, Quat};
 use log::info;
 use wgpu::util::DeviceExt;
 
 use crate::render::{
+    material::{simple::SimpleMaterial, MaterialManager},
     mesh::{MeshAssets, VertexTrait},
     shader::ShaderAssets,
     texture::{Texture, TextureAssets},
@@ -17,8 +17,9 @@ use crate::render::{
 
 use super::Layouts;
 
-pub const DEFAULT_DIFFUSE_TEXTURE: &str = "white";
 pub const DEFAULT_SHADER: &str = "model";
+pub const DEFAULT_TEXTURE: &str = "white";
+pub const DEFAULT_MATERIAL: &str = "model";
 
 pub struct Bundle {
     pub pipelines: HashMap<String, Pipeline>,
@@ -29,12 +30,16 @@ impl Bundle {
     pub fn new(
         shaders: &mut ShaderAssets,
         textures: &mut TextureAssets,
+        materials: &mut MaterialManager,
     ) -> Self {
-        textures.load(DEFAULT_DIFFUSE_TEXTURE);
+        textures.load(DEFAULT_TEXTURE);
 
         let mut registered_shaders = HashSet::new();
         registered_shaders.insert(DEFAULT_SHADER.to_string());
         shaders.load(DEFAULT_SHADER);
+
+        let material = SimpleMaterial::new(DEFAULT_SHADER, DEFAULT_TEXTURE);
+        materials.add(DEFAULT_MATERIAL, material);
 
         Self {
             pipelines: HashMap::new(),
@@ -124,6 +129,11 @@ impl Instance {
     }
 }
 
+struct MaterialData {
+    bind_group: wgpu::BindGroup,
+    buffer: wgpu::Buffer,
+}
+
 #[derive(Default)]
 struct InstanceArray {
     buffer: Option<wgpu::Buffer>,
@@ -133,13 +143,12 @@ struct InstanceArray {
 #[derive(Hash, PartialEq, Eq)]
 struct Key {
     mesh_id: String,
-    texture_id: String,
-    shader_id: String,
+    material_id: String,
 }
 
 #[derive(Default)]
 pub struct Batches {
-    bind_groups: HashMap<String, wgpu::BindGroup>,
+    materials: HashMap<String, MaterialData>,
     instances: HashMap<Key, InstanceArray>,
 }
 
@@ -147,14 +156,12 @@ impl Batches {
     pub fn add_model(
         &mut self,
         mesh_id: String,
-        texture_id: String,
-        shader_id: String,
+        material_id: String,
         instance: Instance,
     ) {
         let key = Key {
             mesh_id,
-            texture_id,
-            shader_id,
+            material_id,
         };
         self.instances.entry(key).or_default().data.push(instance);
     }
@@ -162,27 +169,49 @@ impl Batches {
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         layouts: &Layouts,
         textures: &TextureAssets,
+        materials: &MaterialManager,
     ) {
         for (key, instances) in &mut self.instances {
             if instances.data.is_empty() {
                 continue;
             }
 
-            if let Some(texture) = textures.get(&key.texture_id) {
-                self.bind_groups
-                    .entry(key.texture_id.clone())
-                    .or_insert_with(|| {
+            let Some(texture_id) = materials.get_texture_id(&key.material_id)
+            else {
+                return;
+            };
+            if let (Some(texture), Some(uniform_data)) = (
+                textures.get(&texture_id),
+                materials.get_uniform_data_bytes(&key.material_id),
+            ) {
+                match self.materials.entry(key.material_id.clone()) {
+                    Entry::Occupied(entry) => {
+                        let material_data = entry.get();
+                        queue.write_buffer(
+                            &material_data.buffer,
+                            0,
+                            &uniform_data,
+                        );
+                    }
+                    Entry::Vacant(entry) => {
+                        let label =
+                            format!("model_{}_uniform", key.material_id);
                         let buffer = device.create_buffer_init(
                             &wgpu::util::BufferInitDescriptor {
-                                label: Some("model_uniform"),
-                                contents: &Uniform::default().as_bytes(),
-                                usage: wgpu::BufferUsages::UNIFORM,
+                                label: Some(&label),
+                                contents: &uniform_data,
+                                usage: wgpu::BufferUsages::UNIFORM
+                                    | wgpu::BufferUsages::COPY_DST,
                             },
                         );
-                        layouts.model.bind(device, &buffer, texture)
-                    });
+                        let bind_group =
+                            layouts.model.bind(device, &buffer, texture);
+                        entry.insert(MaterialData { bind_group, buffer });
+                    }
+                };
             }
 
             instances.buffer = Some(device.create_buffer_init(
@@ -200,21 +229,26 @@ impl Batches {
         rpass: &mut wgpu::RenderPass,
         bundle: &Bundle,
         meshes: &MeshAssets,
+        materials: &MaterialManager,
     ) {
         for (key, instances) in &self.instances {
             if instances.data.is_empty() {
                 continue;
             }
 
+            let Some(shader_id) = materials.get_shader_id(&key.material_id)
+            else {
+                continue;
+            };
             let (
                 Some(mesh),
-                Some(bind_group),
+                Some(material_data),
                 Some(pipeline),
                 Some(instances_buffer),
             ) = (
                 meshes.get(&key.mesh_id),
-                self.bind_groups.get(&key.texture_id),
-                bundle.pipelines.get(&key.shader_id),
+                self.materials.get(&key.material_id),
+                bundle.pipelines.get(&shader_id),
                 &instances.buffer,
             )
             else {
@@ -222,7 +256,7 @@ impl Batches {
             };
 
             rpass.set_pipeline(&pipeline.pipeline);
-            rpass.set_bind_group(2, bind_group, &[]);
+            rpass.set_bind_group(2, &material_data.bind_group, &[]);
             rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 mesh.index_buffer.slice(..),
@@ -239,25 +273,6 @@ impl Batches {
 
     pub fn clear(&mut self) {
         self.instances.clear();
-    }
-}
-
-#[derive(ShaderType)]
-pub struct Uniform {
-    bloup: f32,
-}
-
-impl Default for Uniform {
-    fn default() -> Self {
-        Self { bloup: 42.0 }
-    }
-}
-
-impl Uniform {
-    fn as_bytes(&self) -> Vec<u8> {
-        let mut buffer = encase::UniformBuffer::new(Vec::<u8>::new());
-        buffer.write(self).unwrap();
-        buffer.into_inner()
     }
 }
 

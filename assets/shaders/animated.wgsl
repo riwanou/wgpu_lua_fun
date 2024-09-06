@@ -74,12 +74,12 @@ struct PointLightData {
 @group(1) @binding(0)
 var<storage, read> point_lights: PointLightData;
 
-struct Uniform {
-    bloup: f32,
+struct SimpleMaterial {
+    color: vec3<f32>,
 }
 
 @group(2) @binding(0)
-var<uniform> uniform: Uniform;
+var<uniform> uniform: SimpleMaterial;
 @group(2) @binding(1)
 var t_diffuse: texture_2d<f32>;
 @group(2) @binding(2)
@@ -96,7 +96,7 @@ fn attenuate(distance: f32, radius: f32) -> f32 {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let val = map(cos(globals.elapsed), -1.0, 1.0, 0.0, 1.0);
+    let val = map(cos(globals.elapsed * 3), -1.0, 1.0, 0.0, 1.0);
     var ease = 0.0;
     if val < 0.5 {
         ease = 4 * val * val * val;
@@ -106,7 +106,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     let diffuse_sample = textureSample(t_diffuse, s_diffuse, in.tex_coords);
-    let color = mix(diffuse_sample.xyz, vec3<f32>(val, 0.2, 0.3), ease);
+    let color = mix(diffuse_sample.xyz, val * uniform.color, ease);
 
     return vec4<f32>(color, 1.0);
 }

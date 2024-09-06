@@ -74,12 +74,12 @@ struct PointLightData {
 @group(1) @binding(0)
 var<storage, read> point_lights: PointLightData;
 
-struct Uniform {
-    bloup: f32,
+struct SimpleMaterial {
+    color: vec3<f32>,
 }
 
 @group(2) @binding(0)
-var<uniform> uniform: Uniform;
+var<uniform> uniform: SimpleMaterial;
 @group(2) @binding(1)
 var t_diffuse: texture_2d<f32>;
 @group(2) @binding(2)

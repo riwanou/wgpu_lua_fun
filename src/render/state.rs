@@ -6,6 +6,7 @@ use crate::scene::Scene;
 
 use super::{
     bundle::{Bundles, Layouts},
+    material::MaterialManager,
     mesh::MeshAssets,
     shader::ShaderAssets,
     texture::{Texture, TextureAssets},
@@ -19,6 +20,7 @@ pub struct RenderState {
     pub depth: Texture,
     pub device: wgpu::Device,
     layouts: Layouts,
+    pub materials: MaterialManager,
     pub meshes: MeshAssets,
     queue: wgpu::Queue,
     pub shaders: ShaderAssets,
@@ -55,9 +57,15 @@ impl RenderState {
         let mut shaders = ShaderAssets::new();
         let mut textures = TextureAssets::new();
         let meshes = MeshAssets::new();
+        let mut materials = MaterialManager::new();
         let layouts = Layouts::new(&device);
-        let bundles =
-            Bundles::new(&device, &layouts, &mut shaders, &mut textures);
+        let bundles = Bundles::new(
+            &device,
+            &layouts,
+            &mut shaders,
+            &mut textures,
+            &mut materials,
+        );
         let depth = Texture::create_depth(&device, &config);
 
         Self {
@@ -68,6 +76,7 @@ impl RenderState {
             device,
             _instance: instance,
             layouts,
+            materials,
             meshes,
             queue,
             shaders,
@@ -120,8 +129,10 @@ impl RenderState {
         );
         scene.model_batches.prepare(
             &self.device,
+            &self.queue,
             &self.layouts,
             &self.textures,
+            &self.materials,
         );
 
         {
@@ -161,6 +172,7 @@ impl RenderState {
                 &mut rpass,
                 &self.bundles.model,
                 &self.meshes,
+                &self.materials,
             );
         }
 

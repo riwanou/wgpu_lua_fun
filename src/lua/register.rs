@@ -20,6 +20,7 @@ use crate::{
     render::{
         bundle::{lights, model},
         camera::Camera,
+        material::simple::{self, SimpleMaterial},
         state::RenderState,
     },
     scene::Scene,
@@ -155,17 +156,14 @@ fn register_scene_methods_mut<T: std::borrow::BorrowMut<Scene> + fmt::Debug>(
         "batch_model",
         |_,
          this,
-         (mesh_id, texture_id, shader_id, transform): (
+         (mesh_id, material_id, transform): (
             String,
-            Option<String>,
             Option<String>,
             UserDataRef<Transform>,
         )| {
             this.borrow_mut().model_batches.add_model(
                 mesh_id,
-                texture_id
-                    .unwrap_or(model::DEFAULT_DIFFUSE_TEXTURE.to_string()),
-                shader_id.unwrap_or(model::DEFAULT_SHADER.to_string()),
+                material_id.unwrap_or(model::DEFAULT_MATERIAL.to_string()),
                 model::Instance::new(transform.build_matrix(), transform.rot),
             );
             Ok(())
@@ -248,15 +246,58 @@ fn register_render_state(lua: &Lua) -> Result<()> {
             this.meshes.load(&mesh_id);
             Ok(())
         });
-        reg.add_method_mut("load_texture", |_, this, texture_id: String| {
-            this.textures.load(&texture_id);
-            Ok(())
-        });
-        reg.add_method_mut("load_shader", |_, this, shader_id: String| {
-            this.shaders.load(&shader_id);
-            this.bundles.model.register_shader(&shader_id);
-            Ok(())
-        });
+        reg.add_method_mut(
+            "add_material",
+            |_, this, (material_type, values): (String, Table)| {
+                let key = values
+                    .raw_get::<_, String>("key")
+                    .map_err(|_| Error::runtime("material must have key"))?;
+
+                match material_type.as_bytes() {
+                    b"simple" => {
+                        let shader_id = values
+                            .raw_get::<_, String>("shader")
+                            .unwrap_or(model::DEFAULT_SHADER.to_string());
+                        let texture_id = values
+                            .raw_get::<_, String>("texture")
+                            .unwrap_or(model::DEFAULT_TEXTURE.to_string());
+
+                        this.shaders.load(&shader_id);
+                        this.bundles.model.register_shader(&shader_id);
+                        this.textures.load(&texture_id);
+
+                        this.materials.add(
+                            &key,
+                            SimpleMaterial::new(&shader_id, &texture_id),
+                        );
+                    }
+                    _ => return Err(Error::runtime("unknown material type")),
+                };
+                Ok(())
+            },
+        );
+        reg.add_method_mut(
+            "material_data",
+            |_, this, (material_id, values): (String, Table)| {
+                let material = this
+                    .materials
+                    .get_mut_any(&material_id)
+                    .ok_or(Error::runtime("material key does not exist"))?;
+
+                if let Some(material) =
+                    material.downcast_mut::<SimpleMaterial>()
+                {
+                    let u = &material.uniform;
+                    let color = values
+                        .raw_get::<_, UserDataRef<Vec3>>("color")
+                        .map(|v| *v)
+                        .unwrap_or(u.color);
+                    material.uniform = simple::Uniform { color };
+                }
+
+                Ok(())
+            },
+        );
     })
 }
 
