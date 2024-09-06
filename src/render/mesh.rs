@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::Cursor,
     ops::Deref,
     sync::{
@@ -34,17 +34,18 @@ impl Mesh {
         device: &wgpu::Device,
         vertices: &[Vertex],
         indices: &[u32],
+        label: &str,
     ) -> Self {
         let vertex_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("mesh_vertex_buffer"),
+                label: Some(&format!("mesh_{}_vertex_buffer", label)),
                 contents: cast_slice(vertices),
                 usage: wgpu::BufferUsages::VERTEX,
             });
 
         let index_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("mesh_index_buffer"),
+                label: Some(&format!("mesh_{}_index_buffer", label)),
                 contents: cast_slice(indices),
                 usage: wgpu::BufferUsages::INDEX,
             });
@@ -70,14 +71,15 @@ impl Asset for ObjSource {
     type Loader = loader::LoadFrom<String, loader::StringLoader>;
 }
 
-type LoadResult = Result<(String, Box<Vec<model::Vertex>>, Box<Vec<u32>>)>;
+type LoadResult = (String, Result<(Box<Vec<model::Vertex>>, Box<Vec<u32>>)>);
 
 pub struct MeshAssets {
     cache: Arc<AssetCache>,
     last_reload: Instant,
-    meshes: HashMap<String, Mesh>,
     load_rx: Receiver<LoadResult>,
     load_tx: Sender<LoadResult>,
+    loaded: HashSet<String>,
+    meshes: HashMap<String, Mesh>,
 }
 
 impl MeshAssets {
@@ -86,9 +88,10 @@ impl MeshAssets {
         Self {
             cache: Arc::new(AssetCache::new("assets/meshes").unwrap()),
             last_reload: Instant::now(),
-            meshes: HashMap::new(),
             load_rx,
             load_tx,
+            loaded: HashSet::new(),
+            meshes: HashMap::new(),
         }
     }
 
@@ -106,17 +109,18 @@ impl MeshAssets {
             }
         }
 
-        if let Ok(result) = self.load_rx.try_recv() {
+        if let Ok((mesh_id, result)) = self.load_rx.try_recv() {
             match result {
-                Ok((mesh_id, vertices, indices)) => {
+                Ok((vertices, indices)) => {
                     info!("Mesh loaded: {}", mesh_id);
                     self.meshes.insert(
-                        mesh_id,
-                        Mesh::new(device, &vertices, &indices),
+                        mesh_id.clone(),
+                        Mesh::new(device, &vertices, &indices, &mesh_id),
                     );
                 }
                 Err(err) => {
                     error!("load\n{:?}", err);
+                    self.loaded.remove(&mesh_id);
                 }
             };
         }
@@ -167,16 +171,17 @@ impl MeshAssets {
                     indices.append(&mut m.mesh.indices);
                 }
 
-                Ok((mesh_id, Box::new(vertices), Box::new(indices)))
+                Ok((Box::new(vertices), Box::new(indices)))
             })();
-            load_tx.send(result).unwrap();
+            load_tx.send((mesh_id, result)).unwrap();
         });
     }
 
     pub fn load(&mut self, mesh_id: &str) {
-        if self.cache.contains::<ObjSource>(mesh_id) {
+        if self.loaded.contains(mesh_id) {
             return;
         }
+        self.loaded.insert(mesh_id.to_string());
         self.load_internal(mesh_id);
     }
 }

@@ -63,7 +63,7 @@ impl Bundle {
             let module = shaders.get(shader_id).unwrap();
             self.pipelines.insert(
                 shader_id.clone(),
-                Pipeline::new(device, config, layouts, module),
+                Pipeline::new(device, config, layouts, module, shader_id),
             );
         }
     }
@@ -197,11 +197,12 @@ impl Batches {
                         );
                     }
                     Entry::Vacant(entry) => {
-                        let label =
-                            format!("model_{}_uniform", key.material_id);
                         let buffer = device.create_buffer_init(
                             &wgpu::util::BufferInitDescriptor {
-                                label: Some(&label),
+                                label: Some(&format!(
+                                    "model_{}_uniform",
+                                    key.material_id
+                                )),
                                 contents: &uniform_data,
                                 usage: wgpu::BufferUsages::UNIFORM
                                     | wgpu::BufferUsages::COPY_DST,
@@ -216,7 +217,7 @@ impl Batches {
 
             instances.buffer = Some(device.create_buffer_init(
                 &wgpu::util::BufferInitDescriptor {
-                    label: Some("model_instance"),
+                    label: Some(&format!("model_{}_instance", key.material_id)),
                     contents: cast_slice(&instances.data),
                     usage: wgpu::BufferUsages::VERTEX,
                 },
@@ -358,6 +359,7 @@ impl Pipeline {
         config: &wgpu::SurfaceConfiguration,
         layouts: &Layouts,
         module: &wgpu::ShaderModule,
+        label: &str,
     ) -> Self {
         let pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -372,7 +374,7 @@ impl Pipeline {
 
         let pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("model_pipeline"),
+                label: Some(&format!("model_{}_pipeline", label)),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module,

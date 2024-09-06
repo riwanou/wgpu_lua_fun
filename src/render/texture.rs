@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{
         mpsc::{channel, Receiver, Sender},
         Arc,
@@ -28,6 +28,7 @@ impl Texture {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         image: &DynamicImage,
+        label: &str,
     ) -> Self {
         let rgba = image.to_rgba8();
         let dimensions = image.dimensions();
@@ -39,7 +40,7 @@ impl Texture {
         };
 
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("image_texture"),
+            label: Some(&format!("{}_texture", label)),
             size,
             mip_level_count: 1,
             sample_count: 1,
@@ -126,13 +127,14 @@ impl Asset for Image {
     type Loader = ImageLoader;
 }
 
-type LoadResult = Result<(String, Box<DynamicImage>)>;
+type LoadResult = (String, Result<Box<DynamicImage>>);
 
 pub struct TextureAssets {
     cache: Arc<AssetCache>,
     last_reload: Instant,
     load_rx: Receiver<LoadResult>,
     load_tx: Sender<LoadResult>,
+    loaded: HashSet<String>,
     textures: HashMap<String, Texture>,
 }
 
@@ -144,6 +146,7 @@ impl TextureAssets {
             last_reload: Instant::now(),
             load_rx,
             load_tx,
+            loaded: HashSet::new(),
             textures: HashMap::new(),
         }
     }
@@ -162,17 +165,18 @@ impl TextureAssets {
             }
         }
 
-        if let Ok(result) = self.load_rx.try_recv() {
+        if let Ok((texture_id, result)) = self.load_rx.try_recv() {
             match result {
-                Ok((texture_id, image)) => {
+                Ok(image) => {
                     info!("Texture loaded: {}", texture_id);
                     self.textures.insert(
-                        texture_id,
-                        Texture::from_image(device, queue, &image),
+                        texture_id.clone(),
+                        Texture::from_image(device, queue, &image, &texture_id),
                     );
                 }
                 Err(err) => {
                     error!("load\n{:?}", err);
+                    self.loaded.remove(&texture_id);
                 }
             };
         }
@@ -191,16 +195,17 @@ impl TextureAssets {
             let result = (|| {
                 let handle = cache.load::<Image>(&texture_id)?;
                 let data = handle.read().0.clone();
-                Ok((texture_id, Box::new(data)))
+                Ok(Box::new(data))
             })();
-            load_tx.send(result).unwrap();
+            load_tx.send((texture_id, result)).unwrap();
         });
     }
 
     pub fn load(&mut self, texture_id: &str) {
-        if self.cache.contains::<Image>(texture_id) {
+        if self.loaded.contains(texture_id) {
             return;
         }
+        self.loaded.insert(texture_id.to_string());
         self.load_internal(texture_id);
     }
 }

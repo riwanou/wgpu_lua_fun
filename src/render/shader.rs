@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{
         mpsc::{channel, Receiver, Sender},
         Arc,
@@ -26,15 +26,16 @@ impl Asset for WgslSource {
     type Loader = loader::LoadFrom<String, loader::StringLoader>;
 }
 
-type LoadResult = Result<(String, String)>;
+type LoadResult = (String, Result<String>);
 
 pub struct ShaderAssets {
     cache: Arc<AssetCache>,
+    pub frame_reloaded: Option<String>,
     last_reload: Instant,
     load_rx: Receiver<LoadResult>,
     load_tx: Sender<LoadResult>,
+    loaded: HashSet<String>,
     modules: HashMap<String, wgpu::ShaderModule>,
-    pub frame_reloaded: Option<String>,
 }
 
 impl ShaderAssets {
@@ -42,11 +43,12 @@ impl ShaderAssets {
         let (load_tx, load_rx) = channel();
         Self {
             cache: Arc::new(AssetCache::new("assets/shaders").unwrap()),
+            frame_reloaded: None,
             last_reload: Instant::now(),
-            modules: HashMap::new(),
             load_rx,
             load_tx,
-            frame_reloaded: None,
+            loaded: HashSet::new(),
+            modules: HashMap::new(),
         }
     }
 
@@ -65,9 +67,9 @@ impl ShaderAssets {
             }
         }
 
-        if let Ok(result) = self.load_rx.try_recv() {
+        if let Ok((shader_id, result)) = self.load_rx.try_recv() {
             match result {
-                Ok((shader_id, source)) => {
+                Ok(source) => {
                     info!("Shader loaded: {}", shader_id);
                     let module = device.create_shader_module(
                         wgpu::ShaderModuleDescriptor {
@@ -80,6 +82,7 @@ impl ShaderAssets {
                 }
                 Err(err) => {
                     error!("load\n{:?}", err);
+                    self.loaded.remove(&shader_id);
                 }
             };
         }
@@ -106,16 +109,17 @@ impl ShaderAssets {
         get_pool().execute(move || {
             let result = (|| {
                 let source = cache.load::<WgslSource>(&module_id)?.read();
-                Ok((module_id, source.0.clone()))
+                Ok(source.0.clone())
             })();
-            load_tx.send(result).unwrap();
+            load_tx.send((module_id, result)).unwrap();
         });
     }
 
     pub fn load(&mut self, shader_id: &str) {
-        if self.cache.contains::<WgslSource>(shader_id) {
+        if self.loaded.contains(shader_id) {
             return;
         }
+        self.loaded.insert(shader_id.to_string());
         self.load_internal(shader_id);
     }
 }
